@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torchvision.models as models
+import torch
 
 from exceptions.exceptions import InvalidBackboneError
 
@@ -12,10 +13,15 @@ class MorphCLR(nn.Module):
                             "resnet50": models.resnet50(pretrained=False, num_classes=out_dim)}
 
         self.backbone = self._get_basemodel(base_model)
-        dim_mlp = self.backbone.fc.in_features
 
-        # add mlp projection head
-        self.backbone.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.backbone.fc)
+        # Freeze gradients of the resnet for extra sanity
+        for x in self.backbone.parameters(): x.requires_grad = False
+
+        dim_mlp = self.backbone.fc.out_features
+
+        self.test_variable = nn.Parameter(torch.randn(dim_mlp))
+
+
         
 
     def _get_basemodel(self, model_name):
@@ -26,6 +32,9 @@ class MorphCLR(nn.Module):
                 "Invalid backbone architecture. Check the config file and pass one of: resnet18 or resnet50")
         else:
             return model
-
+    def get_parameters(self):
+        return [self.test_variable,]
     def forward(self, x):
-        return self.backbone(x)
+        print("#### test variable ####\n", self.test_variable)
+        print("#### backbone variable ####\n", self.backbone.fc.weight)
+        return self.backbone(x) + self.test_variable[None, :]
