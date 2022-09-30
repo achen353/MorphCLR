@@ -33,6 +33,7 @@ class MorphCLR(nn.Module):
         else:
             return model
     def get_parameters(self):
+        # only provide parameters of stuff that isn't backbone/resnet
         return [self.test_variable,]
     def forward(self, x):
         print("#### test variable ####\n", self.test_variable)
