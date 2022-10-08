@@ -14,8 +14,9 @@ def image_normalization(img, img_min=0, img_max=255):
     """
     img = np.float32(img)
     epsilon = 1e-12  # whenever an inconsistent image
-    img = (img-np.min(img))*(img_max-img_min) / \
-        ((np.max(img)-np.min(img))+epsilon)+img_min
+    img = (img - np.min(img)) * (img_max - img_min) / (
+        (np.max(img) - np.min(img)) + epsilon
+    ) + img_min
     return img
 
 
@@ -75,13 +76,13 @@ def image_normalization(img, img_min=0, img_max=255):
 #     cv.destroyAllWindows()
 def tensor2edge(tensor):
     print(tensor.shape)
-    tensor =torch.squeeze(tensor) if len(tensor.shape)>2 else tensor
+    tensor = torch.squeeze(tensor) if len(tensor.shape) > 2 else tensor
     tmp = torch.sigmoid(tensor)
     tmp = tmp.cpu().detach().numpy()
     # tmp = np.transpose(np.squeeze(tmp[1]), [1, 2, 0])
     tmp = np.uint8(image_normalization(tmp))
     tmp = cv.bitwise_not(tmp)
     tmp = cv.cvtColor(tmp, cv.COLOR_GRAY2BGR)
-    cv.imshow('test_img', tmp)
+    cv.imshow("test_img", tmp)
     cv.waitKey(0)
     cv.destroyAllWindows()

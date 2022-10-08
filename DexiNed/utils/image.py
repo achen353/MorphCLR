@@ -6,8 +6,7 @@ import torch
 import kornia as kn
 
 
-def image_normalization(img, img_min=0, img_max=255,
-                        epsilon=1e-12):
+def image_normalization(img, img_min=0, img_max=255, epsilon=1e-12):
     """This is a typical image normalization function
     where the minimum and maximum of the image is needed
     source: https://en.wikipedia.org/wiki/Normalization_(image_processing)
@@ -21,9 +20,11 @@ def image_normalization(img, img_min=0, img_max=255,
 
     img = np.float32(img)
     # whenever an inconsistent image
-    img = (img - np.min(img)) * (img_max - img_min) / \
-        ((np.max(img) - np.min(img)) + epsilon) + img_min
+    img = (img - np.min(img)) * (img_max - img_min) / (
+        (np.max(img) - np.min(img)) + epsilon
+    ) + img_min
     return img
+
 
 def count_parameters(model=None):
     if model is not None:
@@ -32,7 +33,10 @@ def count_parameters(model=None):
         print("Error counting model parameters line 32 img_processing.py")
         raise NotImplementedError
 
-def save_image_batch_to_disk(tensor, output_dir, file_names, img_shape=None, arg=None, is_inchannel=False):
+
+def save_image_batch_to_disk(
+    tensor, output_dir, file_names, img_shape=None, arg=None, is_inchannel=False
+):
 
     os.makedirs(output_dir, exist_ok=True)
     if not arg.is_testing:
@@ -41,27 +45,28 @@ def save_image_batch_to_disk(tensor, output_dir, file_names, img_shape=None, arg
         img_height, img_width = img_shape[2], img_shape[3]
         for tensor_image, file_name in zip(tensor, file_names):
             image_vis = kn.utils.tensor_to_image(
-                torch.sigmoid(tensor_image))#[..., 0]
-            image_vis = (255.0*(1.0 - image_vis)).astype(np.uint8)
+                torch.sigmoid(tensor_image)
+            )  # [..., 0]
+            image_vis = (255.0 * (1.0 - image_vis)).astype(np.uint8)
             output_file_name = os.path.join(output_dir, file_name)
-            image_vis =cv2.resize(image_vis, (img_width, img_height))
+            image_vis = cv2.resize(image_vis, (img_width, img_height))
             assert cv2.imwrite(output_file_name, image_vis)
     else:
         if is_inchannel:
 
             tensor, tensor2 = tensor
-            fuse_name = 'fusedCH'
-            av_name='avgCH'
-            is_2tensors=True
+            fuse_name = "fusedCH"
+            av_name = "avgCH"
+            is_2tensors = True
             edge_maps2 = []
             for i in tensor2:
                 tmp = torch.sigmoid(i).cpu().detach().numpy()
                 edge_maps2.append(tmp)
             tensor2 = np.array(edge_maps2)
         else:
-            fuse_name = 'fused'
-            av_name = 'avg'
-            tensor2=None
+            fuse_name = "fused"
+            av_name = "avg"
+            tensor2 = None
             tmp_img2 = None
 
         output_dir_f = os.path.join(output_dir, fuse_name)
@@ -105,14 +110,20 @@ def save_image_batch_to_disk(tensor, output_dir, file_names, img_shape=None, arg
                     tmp_img2 = cv2.bitwise_not(tmp_img2)
 
                 # Resize prediction to match input image size
-                if not tmp_img.shape[1] == i_shape[0] or not tmp_img.shape[0] == i_shape[1]:
+                if (
+                    not tmp_img.shape[1] == i_shape[0]
+                    or not tmp_img.shape[0] == i_shape[1]
+                ):
                     tmp_img = cv2.resize(tmp_img, (i_shape[0], i_shape[1]))
-                    tmp_img2 = cv2.resize(tmp_img2, (i_shape[0], i_shape[1])) if tmp2 is not None else None
-
+                    tmp_img2 = (
+                        cv2.resize(tmp_img2, (i_shape[0], i_shape[1]))
+                        if tmp2 is not None
+                        else None
+                    )
 
                 if tmp2 is not None:
-                    tmp_mask = np.logical_and(tmp_img>128,tmp_img2<128)
-                    tmp_img= np.where(tmp_mask, tmp_img2, tmp_img)
+                    tmp_mask = np.logical_and(tmp_img > 128, tmp_img2 < 128)
+                    tmp_img = np.where(tmp_mask, tmp_img2, tmp_img)
                     preds.append(tmp_img)
 
                 else:
@@ -125,8 +136,8 @@ def save_image_batch_to_disk(tensor, output_dir, file_names, img_shape=None, arg
                         fuse2 = tmp_img2
                         fuse2 = fuse2.astype(np.uint8)
                         # fuse = fuse-fuse2
-                        fuse_mask=np.logical_and(fuse>128,fuse2<128)
-                        fuse = np.where(fuse_mask,fuse2, fuse)
+                        fuse_mask = np.logical_and(fuse > 128, fuse2 < 128)
+                        fuse = np.where(fuse_mask, fuse2, fuse)
 
                         # print(fuse.shape, fuse_mask.shape)
 
@@ -185,10 +196,7 @@ def visualize_result(imgs_list, arg):
         # print(tmp.shape)
         if tmp.shape[0] == 3:
             tmp = np.transpose(tmp, [1, 2, 0])
-            tmp = restore_rgb([
-                arg.channel_swap,
-                arg.mean_pixel_values[:3]
-            ], tmp)
+            tmp = restore_rgb([arg.channel_swap, arg.mean_pixel_values[:3]], tmp)
             tmp = np.uint8(image_normalization(tmp))
         else:
             tmp = np.squeeze(tmp)
@@ -202,11 +210,21 @@ def visualize_result(imgs_list, arg):
         # print(i,tmp.shape)
     img = data_list[0]
     if n_imgs % 2 == 0:
-        imgs = np.zeros((img.shape[0] * 2 + 10, img.shape[1]
-                         * (n_imgs // 2) + ((n_imgs // 2 - 1) * 5), 3))
+        imgs = np.zeros(
+            (
+                img.shape[0] * 2 + 10,
+                img.shape[1] * (n_imgs // 2) + ((n_imgs // 2 - 1) * 5),
+                3,
+            )
+        )
     else:
-        imgs = np.zeros((img.shape[0] * 2 + 10, img.shape[1]
-                         * ((1 + n_imgs) // 2) + ((n_imgs // 2) * 5), 3))
+        imgs = np.zeros(
+            (
+                img.shape[0] * 2 + 10,
+                img.shape[1] * ((1 + n_imgs) // 2) + ((n_imgs // 2) * 5),
+                3,
+            )
+        )
         n_imgs += 1
 
     k = 0
@@ -216,9 +234,11 @@ def visualize_result(imgs_list, arg):
     for i in range(2):
         for j in range(n_imgs // 2):
             if k < len(data_list):
-                imgs[i * i_step:i * i_step+img.shape[0],
-                     j * j_step:j * j_step+img.shape[1],
-                     :] = data_list[k]
+                imgs[
+                    i * i_step : i * i_step + img.shape[0],
+                    j * j_step : j * j_step + img.shape[1],
+                    :,
+                ] = data_list[k]
                 k += 1
             else:
                 pass
