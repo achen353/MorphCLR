@@ -52,4 +52,4 @@ To be updated.
 
 ## Feature Evaluation
 
-See `feature_eval/mini_batch_logistic_regression_evaluator.ipynb`.
+See [mini_batch_logistic_regression_evaluator.ipynb](feature_eval/mini_batch_logistic_regression_evaluator.ipynb).
