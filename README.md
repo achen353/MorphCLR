@@ -24,7 +24,7 @@ $ conda create --name morphclr --no-default-packages python=3.7.6
 $ conda activate morphclr
 ```
 
-2. Install `pip-tools`:
+2. Install [pip-tools](https://pypi.org/project/pip-tools/):
 
 ```
 $ pip install pip-tools
@@ -32,7 +32,7 @@ $ pip install pip-tools
 
 3. In `requirements.in`, update the link following `--find-links` to the correct repo for your CUDA version. By default the CUDA version is 10.2.
 
-4. Resolve dependencies with `pip-tool`:
+4. Resolve dependencies with pip-tools:
 
 ```
 $ pip-compile requirements.in
