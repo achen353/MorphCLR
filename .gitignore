@@ -46,9 +46,14 @@ htmlcov/
 nosetests.xml
 coverage
 
+# IDE
+.vscode
 
+# MorphCLR
 datasets
 DexiNed/checkpoints
 runs
 __pycache__
 feature_eval/resnet50_50-epochs_stl10.zip
+feature_eval/data/*
+feature_eval/simclr_pretrained_weights/*

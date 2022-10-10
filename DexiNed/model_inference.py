@@ -11,15 +11,19 @@ from config.definitions import ROOT_DIR
 from model import DexiNed
 
 model = None
+
+
 def get_instance(device):
     global model
     if model == None:
-        checkpoint_path = os.path.join(ROOT_DIR, 'checkpoints', 'BIPED', "10", "10_model.pth")
+        checkpoint_path = os.path.join(
+            ROOT_DIR, "checkpoints", "BIPED", "10", "10_model.pth"
+        )
         model = DexiNed().to(device)
-        model.load_state_dict(torch.load(checkpoint_path,
-                                     map_location=device))
+        model.load_state_dict(torch.load(checkpoint_path, map_location=device))
         model.eval()
     return model
+
 
 def model_process(image, device):
     """
@@ -27,19 +31,17 @@ def model_process(image, device):
     """
     model = get_instance(device)
     image, image_shape = pre_process(image)
-    image = image[np.newaxis,:]
+    image = image[np.newaxis, :]
     image = image.to(device)
-    image = model(image) # needs to have batch dimension.
+    image = model(image)  # needs to have batch dimension.
     image = post_process_single(image, image_shape)
     return image
 
 
-
-
 def pre_process(image):
-    '''
+    """
     Takes an image and prepares it to be processed by model
-    
+
     Parameters:
     ----------
     image: ndarray
@@ -49,21 +51,23 @@ def pre_process(image):
     --------
     Tuple[ndarray, Tuple[int, int]]
         image and orignial width, height, which will be needed to restore image to original dimensions.
-    '''
+    """
     label_path = None
-    # goal dimensions 
+    # goal dimensions
     image_shape = [image.shape[0], image.shape[1]]
     img_height = 512
     img_width = 512
 
     print(f"actual size: {image.shape}, target size: {( img_height,img_width,)}")
     # img = cv2.resize(img, (self.img_width, self.img_height))
-    image = cv2.resize(image, (img_width,img_height))
+    image = cv2.resize(image, (img_width, img_height))
 
     image = np.array(image, dtype=np.float32)
     # subtract mean pixel values. values found in main.py default args.
-    image -= np.array([103.939,116.779,123.68,137.86])[:3]
-    image = image.transpose((2, 0, 1)) # torch does channel, w, h, whereas cv2 loads the channel last.
+    image -= np.array([103.939, 116.779, 123.68, 137.86])[:3]
+    image = image.transpose(
+        (2, 0, 1)
+    )  # torch does channel, w, h, whereas cv2 loads the channel last.
     image = torch.from_numpy(image.copy()).float()
     gt = None
     gt = np.zeros((image.shape[:2]))
@@ -73,9 +77,10 @@ def pre_process(image):
     img_dict = dict(image=image)
     return (image, image_shape)
 
+
 def post_process_single(image, image_shape):
-    fuse_name = 'fused'
-    av_name = 'avg'
+    fuse_name = "fused"
+    av_name = "avg"
     tmp_img2 = None
     fuse = None
     edge_maps = []
@@ -119,6 +124,7 @@ def post_process_single(image, image_shape):
         average = np.uint8(np.mean(average, axis=0))
     return (fuse, average)
 
+
 def post_process(tensor, image_shape):
     # TODO: be able to process images in a batch???
     pass
@@ -126,9 +132,10 @@ def post_process(tensor, image_shape):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+
     print("hello new world")
     device = torch.device("cuda")
-    images_dir = os.path.join(ROOT_DIR, 'data')
+    images_dir = os.path.join(ROOT_DIR, "data")
     root_dir, _, image_files = list(os.walk(images_dir))[0]
     print(image_files)
     images = []
