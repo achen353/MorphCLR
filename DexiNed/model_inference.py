@@ -87,9 +87,9 @@ def post_process_single(image, image_shape):
     # image_shape = [x.cpu().detach().numpy() for x in image_shape]
     # # (H, W) -> (W, H)
     if not isinstance(image_shape[0], int):
-        image_shape = [[x, y] for x, y in zip(image_shape[0], image_shape[1])]
+        image_shape = [[y, x] for x, y in zip(image_shape[0], image_shape[1])]
     else:
-        image_shape = [image_shape]
+        image_shape = [image_shape[::-1]]
 
     for idx, i_shape in enumerate(image_shape):
         tmp = image[:, idx, ...]
@@ -108,6 +108,9 @@ def post_process_single(image, image_shape):
             if not tmp_img.shape[1] == i_shape[0] or not tmp_img.shape[0] == i_shape[1]:
                 tmp_img = cv2.resize(tmp_img, (i_shape[0], i_shape[1]))
             preds.append(tmp_img)
+            plt.figure()
+            plt.imshow(tmp_img)
+            plt.show()
             if i == 6:
                 fuse = tmp_img
                 fuse = fuse.astype(np.uint8)
@@ -131,16 +134,17 @@ if __name__ == "__main__":
     images = []
     for img_file in image_files:
         images.append(cv2.imread(os.path.join(root_dir, img_file), cv2.IMREAD_COLOR))
-    results = model_process(images[0], device)
-
+    image = images[-1]
+    # results = model_process(image, device)
+    result = cv2.Canny(image, 470, 500)
     fig = plt.figure(figsize=(12, 6), dpi = 75)
-    plt.subplot(1,3,1)
+    plt.subplot(1,2,1)
     plt.title("original")
-    plt.imshow(images[0][:,:,::-1])
-    plt.subplot(1,3,2)
+    plt.imshow(image[:,:,::-1])
+    plt.subplot(1,2,2)
     plt.title("fuse")
-    plt.imshow(results[0])
-    plt.subplot(1,3,3)
-    plt.title("average")
-    plt.imshow(results[1])
+    plt.imshow(result)
+    # plt.subplot(1,3,3)
+    # plt.title("average")
+    # plt.imshow(results[1])
     plt.show()
