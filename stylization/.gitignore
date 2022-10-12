@@ -1,0 +1,7 @@
+models/*.t7
+models/*.py
+data/*
+img/*
+style/*
+stylized_output/*
+__pycache__*
