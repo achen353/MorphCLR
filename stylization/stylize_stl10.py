@@ -164,9 +164,9 @@ def main():
                     except FileExistsError:
                         pass
                     source_name = content_path.split('/')[-1].split('.')[0]
-                    style_name = style_path.split('/')[-1].split('.')[0]
+                    style_category = style_path.split('/')[1]
 
-                    save_name = f'source_{source_name}_style_{style_name}_category_{label}.png'
+                    save_name = f'source_{source_name}_style_{style_category}_category_{label}.png'
                     output_path = os.path.join(save_dir, save_name)
 
                     save_image(output, output_path, padding=0) #default image padding is 2.
