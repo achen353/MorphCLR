@@ -36,7 +36,7 @@ parser.add_argument('--crop', type=int, default=0,
                     help='If set to anything else than 0, center crop of this size will be applied to the content image \
                     after resizing in order to create a squared image (default: 0)')
 
-# random.seed(131213)
+random.seed(0)
 
 def input_transform(size, crop):
     transform_list = []
@@ -58,39 +58,6 @@ def style_transfer(vgg, decoder, content, style, alpha=1.0):
 
 def main():
     args = parser.parse_args()
-
-    # set content and style directories
-    # content_dir = Path(args.content_dir)
-    # style_dir = Path(args.style_dir)
-    # style_dir = style_dir.resolve()
-    # output_dir = Path(args.output_dir)
-    # output_dir = output_dir.resolve()
-    # assert style_dir.is_dir(), 'Style directory not found'
-
-    # # collect content files
-    # extensions = args.extensions
-    # assert len(extensions) > 0, 'No file extensions specified'
-    # content_dir = Path(content_dir)
-    # content_dir = content_dir.resolve()
-    # assert content_dir.is_dir(), 'Content directory not found'
-    # dataset = []
-    # for ext in extensions:
-    #     dataset += list(content_dir.rglob('*.' + ext))
-
-    # assert len(dataset) > 0, 'No images with specified extensions found in content directory' + content_dir
-    # content_paths = sorted(dataset)
-    # print('Found %d content images in %s' % (len(content_paths), content_dir))
-
-    # # collect style files
-    # styles = []
-    # for ext in extensions:
-    #     styles += list(style_dir.rglob('*.' + ext))
-
-    # assert len(styles) > 0, 'No images with specified extensions found in style directory' + style_dir
-    # styles = sorted(styles)
-    # print('Found %d style images in %s' % (len(styles), style_dir))
-
-    # import pdb; pdb.set_trace()
 
     source_dir = args.content_dir
 
