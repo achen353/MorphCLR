@@ -6,7 +6,7 @@ This is a project for [CS 8803 LS](https://sites.google.com/view/cs8803ls-fa22/h
 
 ### Option 1: Install with conda
 
-Create a conda environment with `env.yml`:
+Create a conda environment with `fixed_env.yml`:
 
 ```
 $ conda env create --name morphclr --file fixed_env.yml
