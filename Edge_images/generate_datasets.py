@@ -68,12 +68,14 @@ def preprocess_all_stl10(stl_data_path, destination_path_root):
         split_dir = os.path.join(destination_path_root, ds_split)
         os.makedirs(split_dir, exist_ok=True)
         for i, (image, label) in enumerate(loader):
+            if i < 68000:
+                continue
             path_name = os.path.join(split_dir, str(i) + ".png")
             labels_df.loc[i] = [str(i) + ".png", label]
             Image.fromarray(image[0].numpy()).save(path_name)
-            break
+
 
         labels_df.to_csv(os.path.join(split_dir, "labels.csv"), index=False)
 
 if __name__ == "__main__":
-    preprocess_all_stl10("./datasets", "./Edge_images/Dexi")
+    preprocess_all_stl10("/srv/share4/jbjorner3/datasets", "/srv/share4/jbjorner3/Edge_images/Dexi")
