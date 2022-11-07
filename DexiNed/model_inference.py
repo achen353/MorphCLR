@@ -5,10 +5,10 @@ import numpy as np
 import torch
 import os
 import cv2
-from utils.image import image_normalization
+from DexiNed.utils.image import image_normalization
 
-from config.definitions import ROOT_DIR
-from model import DexiNed
+from DexiNed.config.definitions import ROOT_DIR
+from DexiNed.model import DexiNed
 
 model = None
 
@@ -113,9 +113,9 @@ def post_process_single(image, image_shape):
             if not tmp_img.shape[1] == i_shape[0] or not tmp_img.shape[0] == i_shape[1]:
                 tmp_img = cv2.resize(tmp_img, (i_shape[0], i_shape[1]))
             preds.append(tmp_img)
-            plt.figure()
-            plt.imshow(tmp_img)
-            plt.show()
+            # plt.figure()
+            # plt.imshow(tmp_img)
+            # plt.show()
             if i == 6:
                 fuse = tmp_img
                 fuse = fuse.astype(np.uint8)
@@ -132,26 +132,35 @@ def post_process(tensor, image_shape):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-
-    print("hello new world")
     device = torch.device("cuda")
     images_dir = os.path.join(ROOT_DIR, "data")
     root_dir, _, image_files = list(os.walk(images_dir))[0]
     print(image_files)
     images = []
     for img_file in image_files:
-        images.append(cv2.imread(os.path.join(root_dir, img_file), cv2.IMREAD_COLOR))
+        image = cv2.imread(os.path.join(root_dir, img_file), cv2.IMREAD_COLOR)[:,:,::-1]
+        images.append(image)
+        result = model_process(image, device)[0]
+        c_low = 370
+        c_high = 500
+        result_canny = cv2.Canny(image, c_low, c_high)
+        fig =plt.figure(figsize=(12,6), dpi = 75)
+        plt.subplot(1,3,1)
+        plt.title(f"edge image {img_file}")
+        plt.imshow(image)
+        plt.subplot(1,3,2)
+        plt.title("fuse")
+        plt.imshow(result)
+        plt.subplot(1,3,3)
+        plt.title(f"canny {c_low}, {c_high}")
+        plt.imshow(result_canny)
+        plt.show()
     image = images[-1]
-    # results = model_process(image, device)
-    result = cv2.Canny(image, 470, 500)
-    fig = plt.figure(figsize=(12, 6), dpi = 75)
-    plt.subplot(1,2,1)
-    plt.title("original")
-    plt.imshow(image[:,:,::-1])
-    plt.subplot(1,2,2)
-    plt.title("fuse")
-    plt.imshow(result)
-    # plt.subplot(1,3,3)
-    # plt.title("average")
-    # plt.imshow(results[1])
-    plt.show()
+    # fig = plt.figure(figsize=(12, 6), dpi = 75)
+    # plt.subplot(1,2,1)
+    # plt.title("original")
+    # plt.imshow(image[:,:,::-1])
+    # plt.subplot(1,2,2)
+    # plt.title("fuse")
+    # plt.imshow(result)
+    # plt.show()
