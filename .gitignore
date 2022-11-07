@@ -54,9 +54,9 @@ datasets
 DexiNed/checkpoints
 runs
 __pycache__
-feature_eval/resnet50_50-epochs_stl10.zip
+feature_eval/resnet50_50-epochs_stl10
 feature_eval/data/*
 feature_eval/simclr_pretrained_weights/*
+stylization/inter_class_stylized_dataset
 BrAD
-data
 Edge_images/Dexi

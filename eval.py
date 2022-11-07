@@ -11,7 +11,14 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from torchvision import datasets
 
+from tqdm import tqdm
+import gdown
+import shutil
+
 import torch.nn.functional as F
+
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning) 
 
 convert_tensor = torchvision.transforms.ToTensor()
 
@@ -21,7 +28,7 @@ def get_local_dataset(source_dir):
     # e.g dir/0 (label) / img_x.png
     data = []
     labels = []
-    print("Collecting local images from", source_dir)
+    print("[INFO] Preparing local images from: {}".format(source_dir))
     for source_path in sorted(os.listdir(source_dir)):
         labels.append(int(source_path) - 1)
         source_example_path = sorted(os.listdir(os.path.join(source_dir, source_path)))
@@ -30,7 +37,7 @@ def get_local_dataset(source_dir):
         original_tensors = torch.stack([convert_tensor(Image.open(x).convert('RGB')) for x in source_example_path])
 
         data.append(original_tensors)
-    print(f"Found {len(labels)} labels: {labels}")
+    print("Found {} labels: {}".format(len(labels), labels))
     return data, labels
 
 
@@ -50,7 +57,7 @@ def get_local_stylized_dataset(source_dir):
     data = []
     style_labels = []
     content_labels = []
-    print("Collecting local images fro", source_dir)
+    print("[INFO] Preparing stylzed images from: {}".format(source_dir))
     for source_path in sorted(os.listdir(source_dir)):
         source_example_path = sorted(os.listdir(os.path.join(source_dir, source_path)))
         source_example_path = [os.path.join(source_dir, source_path, x) for x in source_example_path]
@@ -67,13 +74,19 @@ def get_local_stylized_dataset(source_dir):
 
 def compute_accuracy_and_ratio(model, device, data, style_labels, content_labels):
     # logit dim equals number of classes
-    assert model(data[0]).shape[-1] == len(style_labels)
+    print("[INFO] Computing accuracy and style-based decision ratio.")
+    
     model = model.eval()
     model = model.to(device)
+
+    assert model(data[0].to(device)).shape[-1] == len(style_labels)
+    
     accuracies = {}
     style_decisions = {}
     content_decisions = {}
     for x, y_style, y_content in zip(data, style_labels, content_labels):
+        y_style = y_style.to(device)
+        y_content = y_content.to(device)
         preds = model(x.to(device))
         preds = torch.argmax(preds, dim = 1)
         content_count = int(torch.sum(preds == y_content))
@@ -83,11 +96,16 @@ def compute_accuracy_and_ratio(model, device, data, style_labels, content_labels
         content_decisions[label] = content_count
         accuracies[label] = float(content_count/y_content.shape[0])
 
+    print("Accuracy: {}".format(accuracies))
+    print("# of style-based decision per class: {}".format(style_decisions))
+    print("# of texture-based decision per class: {}".format(content_decisions))
+
     return accuracies, style_decisions, content_decisions
 
 def get_stl10_data_loaders(download, shuffle=False, batch_size=256):
+    print("[INFO] Preparing STL10 adversarial data loaders.")
     train_dataset = datasets.STL10(
-        "./data", split="train", download=download, transform=transforms.ToTensor()
+        "./datasets", split="train", download=download, transform=transforms.ToTensor()
     )
 
     train_loader = DataLoader(
@@ -99,7 +117,7 @@ def get_stl10_data_loaders(download, shuffle=False, batch_size=256):
     )
 
     test_dataset = datasets.STL10(
-        "./data", split="test", download=download, transform=transforms.ToTensor()
+        "./datasets", split="test", download=download, transform=transforms.ToTensor()
     )
 
     test_loader = DataLoader(
@@ -131,7 +149,7 @@ def test_adversarial(model, criterion, device, test_loader, epsilon):
     model.eval()
 
     # Loop over all examples in test set
-    for data, target in test_loader:
+    for data, target in tqdm(test_loader):
         # Send the data and label to the device
         data, target = data.to(device), target.to(device)
 
@@ -194,6 +212,7 @@ def test_adversarial(model, criterion, device, test_loader, epsilon):
     return final_acc, adv_examples
 
 def compute_adversarial_accuracies(adv_epsilons, model, device, test_loader):
+    print("[INFO] Computing adversarial accuracies and epsilons.")
 
     adv_accuracies = []
     adv_examples = []
@@ -208,21 +227,39 @@ def compute_adversarial_accuracies(adv_epsilons, model, device, test_loader):
     return adv_accuracies, adv_examples
 
 def main():
-    device = "cpu"
+    print("[INFO] Downloading Stylized STL10")
+    
+    file_id = "1aTVhLVG1pbsFWmoV-KoYB00YSPCSqyEv"
+    gdrive_url = "https://drive.google.com/uc?id={}".format(file_id)
+    stylized_folder_name = "inter_class_stylized_dataset"
+    stylized_folder_path = "stylization/{}".format(stylized_folder_name)
+    zip_name = stylized_folder_name + ".zip"
+    gdown.download(gdrive_url, zip_name, quiet=False)
+    shutil.unpack_archive(zip_name, stylized_folder_path)
+    os.remove(zip_name)
 
-    model_path = "stylization/linear_eval_checkpoint.pt"
+    print("[INFO] Starting evaluation...")
 
-    model = torchvision.models.resnet18(pretrained=False, num_classes=10).to(device)
-    checkpoint = torch.load(model_path)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model = model.eval()
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    # model_path = "./checkpoints/finetune/simclr_resnet50_50-epochs_stl10_100-epochs.pt"
 
-    x, style, content = get_local_stylized_dataset("stylization/stylized_output")
-    print(compute_accuracy_and_ratio(model, device, x, style, content ))
+    # print("[INFO] CUDA Device: {}".format(device))
+    # print("[INFO] Using fine-tuned checkpoint: {}".format(model_path))
 
-    train_loader, test_loader = get_stl10_data_loaders(download=True)
+    # model = torchvision.models.resnet18(pretrained=False, num_classes=10).to(device)
+    # checkpoint = torch.load(model_path)
+    # model.load_state_dict(checkpoint['model_state_dict'])
+    # model = model.eval()
 
-    adv_accuracies, adv_examples = compute_adversarial_accuracies([0, 0.01, 0.02, 0.03, 0.04, 0.05], model, device, test_loader)
+    # print("[INFO] Model checkpoint loaded.")
+
+    # # Evaluate on normal STL10 and stylized STL10
+    # x, style, content = get_local_stylized_dataset(stylized_folder_name)
+    # compute_accuracy_and_ratio(model, device, x, style, content)
+
+    # # Evaluate for adversarial accuracies
+    # _, test_loader = get_stl10_data_loaders(download=True)
+    # compute_adversarial_accuracies([0, 0.01, 0.02, 0.03, 0.04, 0.05], model, device, test_loader)
 
 if __name__ == "__main__":
     main()
