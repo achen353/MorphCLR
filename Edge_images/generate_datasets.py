@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import Dataset
 from PIL import Image
 from torchvision import datasets
-from data_aug.dexined_aug import DexinedAug
+from data_aug.dexined_aug import CannyAug, DexinedAug
 
 class DexiNedDataset(Dataset):
     def __init__(self, 
@@ -53,11 +53,11 @@ class DexiNedTestDataset(DexiNedDataset):
         super().__init__(csv_file, root_dir, transform)
 
 
-def preprocess_all_stl10(stl_data_path, destination_path_root):
+def preprocess_all_stl10(stl_data_path, destination_path_root, transform=DexinedAug()):
     """Convert all images from stl10 to edge versions and save them in the same directory"""
     print("provided stl_data_path", stl_data_path)
     for ds_split in ['train', 'unlabeled', 'test']:
-        ds = datasets.STL10(stl_data_path, split=ds_split, transform=DexinedAug(), download=True)
+        ds = datasets.STL10(stl_data_path, split=ds_split, transform=transform, download=True)
         loader = torch.utils.data.DataLoader(
             ds,
             num_workers=1,
@@ -71,9 +71,9 @@ def preprocess_all_stl10(stl_data_path, destination_path_root):
             path_name = os.path.join(split_dir, str(i) + ".png")
             labels_df.loc[i] = [str(i) + ".png", label]
             Image.fromarray(image[0].numpy()).save(path_name)
-            break
 
         labels_df.to_csv(os.path.join(split_dir, "labels.csv"), index=False)
+    
 
 if __name__ == "__main__":
-    preprocess_all_stl10("./datasets", "./Edge_images/Dexi")
+    preprocess_all_stl10("./datasets", "./Edge_images/Canny", transform=CannyAug())

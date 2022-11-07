@@ -59,3 +59,4 @@ feature_eval/data/*
 feature_eval/simclr_pretrained_weights/*
 BrAD
 data
+Edge_images/Dexi
