@@ -90,4 +90,4 @@ If you find any of the existing/new scripts caching the STL10 dataset elsewhere,
 
 ### Checkpoint Directory
 
-Please save all the checkpoints to `./checkpoints/` depending on whether it is from `pretraining` or `finetuning`.
+Please save all the checkpoints to `./checkpoints/` depending on whether it is from pretraining or finetuning.
