@@ -9,6 +9,7 @@ black[jupyter]
 
 # ---- Util
 tqdm
+gdown
 pyyaml
 ipykernel
 

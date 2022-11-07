@@ -36,6 +36,7 @@ dependencies:
   - tqdm=4.64.1
   - typing_extensions=4.3.0
   - yaml=0.2.5
+  - gdown=4.5.1
   - pip:
     - pillow==6.2.2
 

@@ -10,6 +10,8 @@ absl-py==1.2.0
     # via tensorboard
 backcall==0.2.0
     # via ipython
+beautifulsoup4==4.11.1
+    # via gdown
 black[jupyter]==22.10.0
     # via -r requirements.in
 cachetools==5.2.0
@@ -28,8 +30,12 @@ decorator==5.1.1
     # via ipython
 entrypoints==0.4
     # via jupyter-client
+filelock==3.8.0
+    # via gdown
 fonttools==4.37.4
     # via matplotlib
+gdown==4.5.3
+    # via -r requirements.in
 google-auth==2.12.0
     # via
     #   google-auth-oauthlib
@@ -128,6 +134,8 @@ pyparsing==3.0.9
     # via
     #   matplotlib
     #   packaging
+pysocks==1.7.1
+    # via requests
 python-dateutil==2.8.2
     # via
     #   jupyter-client
@@ -138,8 +146,9 @@ pyzmq==24.0.1
     # via
     #   ipykernel
     #   jupyter-client
-requests==2.28.1
+requests[socks]==2.28.1
     # via
+    #   gdown
     #   requests-oauthlib
     #   tensorboard
     #   torchvision
@@ -153,9 +162,12 @@ scipy==1.7.3
     # via scikit-learn
 six==1.16.0
     # via
+    #   gdown
     #   google-auth
     #   grpcio
     #   python-dateutil
+soupsieve==2.3.2.post1
+    # via beautifulsoup4
 tensorboard==2.10.1
     # via -r requirements.in
 tensorboard-data-server==0.6.1
@@ -179,7 +191,9 @@ tornado==6.2
     #   ipykernel
     #   jupyter-client
 tqdm==4.64.1
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   gdown
 traitlets==5.4.0
     # via
     #   ipykernel
