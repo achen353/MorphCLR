@@ -1,0 +1,32 @@
+# Setup: Install the latest version of `pip-tools` with `pip install pip-tools`
+
+# TODO: Set your CUDA version
+--find-links https://download.pytorch.org/whl/cu102/torch_stable.html
+
+# ---- Housekeeping
+pip-tools
+black
+black[jupyter]
+
+# ---- Util
+tqdm
+pyyaml
+ipykernel
+
+# ---- Machine Learning
+matplotlib
+scikit-learn
+scikit-image
+
+# ---- Deep Learning
+torch==1.12.1
+tensorboard
+
+# ---- Computer Vision
+torchvision==0.13.1
+numpy
+opencv-python
+pillow
+
+# ---- Other
+requests
