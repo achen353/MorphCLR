@@ -67,7 +67,7 @@ $ python run.py -data ./datasets --dataset-name stl10 --log-every-n-steps 100 --
 Run the following command with configurations passed as keyword arguments:
 
 ```
-$ python run_morpchclr.py -data ./datasets --dataset-name stl10 --log-every-n-steps 100 --epochs 100
+$ python run_morphclr.py -data ./datasets --dataset-name stl10 --log-every-n-steps 100 --epochs 100
 ```
 
 3. BrAD
