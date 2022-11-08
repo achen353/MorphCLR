@@ -257,7 +257,7 @@ def main_worker(gpu, args):
     if args.aug_plus:
         # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
         augmentation = [
-            transforms.RandomResizedCrop(224, scale=(0.2, 1.0)),
+            transforms.RandomResizedCrop(32, scale=(0.2, 1.0)),
             transforms.RandomApply(
                 [transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8  # not strengthened
             ),
@@ -270,7 +270,7 @@ def main_worker(gpu, args):
     else:
         # MoCo v1's aug: the same as InstDisc https://arxiv.org/abs/1805.01978
         augmentation = [
-            transforms.RandomResizedCrop(224, scale=(0.2, 1.0)),
+            transforms.RandomResizedCrop(32, scale=(0.2, 1.0)),
             transforms.RandomGrayscale(p=0.2),
             transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
             transforms.RandomHorizontalFlip(),
