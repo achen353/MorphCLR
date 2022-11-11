@@ -52,6 +52,32 @@ To be updated.
 
 ## Development
 
+### Pretraining
+
+1. SimCLR
+
+Run the following command with configurations passed as keyword arguments:
+
+```
+$ python run.py -data ./datasets --dataset-name stl10 --log-every-n-steps 100 --epochs 100
+```
+
+2. MorphCLR
+
+Run the following command with configurations passed as keyword arguments:
+
+```
+$ python run_morphclr.py -data ./datasets --dataset-name stl10 --log-every-n-steps 100 --epochs 100
+```
+
+3. BrAD
+
+See the BrAD [README](BrAD/README.md) for commands to train and evaluate the model. STL10 data preparation for BrAD will be updated soon.
+
+### Linear Evaluation (Fine-Tuning)
+
+To fine-tune the pretrained model with linear evaluation, use [linear_evaluator.ipynb](feature_eval/linear_evaluator.ipynb).
+
 ### Full Evaluation
 
 To run full evaluation for the test accuracies on:
@@ -67,10 +93,6 @@ $ python eval.py
 ```
 
 The stylized STL10 should be automatically downloaded and placed in `./stylization/inter_class_stylized_dataset/` directory.
-
-### Linear Evaluation (Fine-Tuning)
-
-To fine-tune the pretrained model with linear evaluation, use [linear_evaluator.ipynb](feature_eval/linear_evaluator.ipynb).
 
 ### Adversarial Evaluation Example
 

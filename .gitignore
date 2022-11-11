@@ -58,5 +58,10 @@ feature_eval/resnet50_50-epochs_stl10
 feature_eval/data/*
 feature_eval/simclr_pretrained_weights/*
 stylization/inter_class_stylized_dataset
-BrAD
 Edge_images/Dexi
+log*
+BrAD/data_splits/clipart/
+BrAD/data_splits/sketch/
+BrAD/data_splits/painting/
+BrAD/data_splits/real/
+BrAD/*.tar
