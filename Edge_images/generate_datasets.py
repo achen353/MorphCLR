@@ -13,11 +13,13 @@ example usage:
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from PIL import Image
-from torchvision import datasets
+from torchvision import datasets, transforms
+from tqdm import tqdm
 from data_aug.dexined_aug import CannyAug, DexinedAug
 from torchvision import transforms
 class DexiNedDataset(Dataset):
@@ -89,26 +91,36 @@ class STL10(datasets.STL10):
 
 def preprocess_all_stl10(stl_data_path, destination_path_root, transform=DexinedAug()):
     """Convert all images from stl10 to edge versions and save them in the same directory"""
-    print("provided stl_data_path", stl_data_path)
-    from torchvision import transforms 
+    print("Provided stl_data_path: ", stl_data_path)
+
+    edge_dest_path_root = os.path.join(destination_path_root, "Dexi")
+    orig_dest_path_root = os.path.join(destination_path_root, "STL10")
+
     for ds_split in ['train', 'unlabeled', 'test']:
-        ds = datasets.STL10(stl_data_path, split=ds_split, transform=transforms.ToTensor(), download=True)
-        loader = torch.utils.data.DataLoader(
-            ds,
+        print("Split: ", ds_split)
+
+        print("Applying DexiNed and saving results.")
+        # Load STL10 and apply DexiNed edge detection
+        edge_dataset = datasets.STL10(stl_data_path, split=ds_split, transform=transforms.ToTensor(), download=True)
+        # Use a data loader with pin_memory = True for faster CPU to GPU memory transfer
+        edge_data_loader = torch.utils.data.DataLoader(
+            edge_dataset,
             num_workers=1,
             pin_memory=True,
-            # drop_last=True, ?
         )
+        # Maintain a dataframe for image labels
         labels_df = pd.DataFrame(columns=["image_num", "label"])
-        split_dir = os.path.join(destination_path_root, ds_split)
-        os.makedirs(split_dir, exist_ok=True)
-        for i, (image, label) in enumerate(loader):
-            image = image[0].permute(1,2,0)
-            image = transform((image * 255).to(torch.uint8))
-            path_name = os.path.join(split_dir, str(i) + ".png")
+        # Create directory for current data split
+        edge_split_dir = os.path.join(edge_dest_path_root, ds_split)
+        os.makedirs(edge_split_dir, exist_ok=True)
+        # Save edge images to directories
+        for i, (edge_img, label) in enumerate(tqdm(edge_data_loader)):
+            edge_img = edge_img[0].permute(1,2,0)
+            edge_img = transform((edge_img * 255).to(torch.uint8))
+            path_name = os.path.join(edge_split_dir, str(i) + ".png")
             labels_df.loc[i] = [str(i) + ".png", label]
             Image.fromarray(image).save(path_name)
-        labels_df.to_csv(os.path.join(split_dir, "labels.csv"), index=False)
+        labels_df.to_csv(os.path.join(edge_split_dir, "labels.csv"), index=False)
 
 
 if __name__ == "__main__":
