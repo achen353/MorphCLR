@@ -59,6 +59,7 @@ feature_eval/data/*
 feature_eval/simclr_pretrained_weights/*
 stylization/inter_class_stylized_dataset
 Edge_images/Dexi
+Edge_images/Dexi.zip
 log*
 BrAD/data_splits/clipart/
 BrAD/data_splits/sketch/
