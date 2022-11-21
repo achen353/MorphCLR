@@ -132,7 +132,7 @@ def main():
     model = MorphCLR(base_model=args.arch, out_dim=args.out_dim)
 
     optimizer = torch.optim.Adam(
-        model.get_parameters(), args.lr, weight_decay=args.weight_decay
+        model.parameters(), args.lr, weight_decay=args.weight_decay
     )
 
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
