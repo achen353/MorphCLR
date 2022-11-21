@@ -40,6 +40,6 @@ class MorphCLR(nn.Module):
         ]
 
     def forward(self, x):
-        print("#### test variable ####\n", self.test_variable)
-        print("#### backbone variable ####\n", self.backbone.fc.weight)
+        # print("#### test variable ####\n", self.test_variable)
+        # print("#### backbone variable ####\n", self.backbone.fc.weight)
         return self.backbone(x) + self.test_variable[None, :]

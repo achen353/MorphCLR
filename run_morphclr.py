@@ -7,6 +7,9 @@ from models.resnet_simclr import ResNetSimCLR
 from models.morphclr import MorphCLR
 from simclr import SimCLR
 
+import warnings
+warnings.filterwarnings("ignore")
+
 model_names = sorted(
     name
     for name in models.__dict__

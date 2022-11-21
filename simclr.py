@@ -20,7 +20,7 @@ class SimCLR(object):
         self.scheduler = kwargs["scheduler"]
         self.writer = SummaryWriter()
         logging.basicConfig(
-            filename=os.path.join(self.writer.log_dir, "training.log"),
+            filename=os.path.join(self.writer.log_dir, "{}_{}_{:04d}_training.log".format(self.args.dataset_name, self.args.arch, self.args.epochs)),
             level=logging.DEBUG,
         )
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
@@ -71,8 +71,8 @@ class SimCLR(object):
         save_config_file(self.writer.log_dir, self.args)
 
         n_iter = 0
-        logging.info(f"Start SimCLR training for {self.args.epochs} epochs.")
-        logging.info(f"Training with gpu: {self.args.disable_cuda}.")
+        logging.info("Start SimCLR training for {} epochs.".format(self.args.epochs))
+        logging.info("Training with gpu: {}.".format(self.args.disable_cuda))
 
         for epoch_counter in range(self.args.epochs):
             for images, _ in tqdm(train_loader):
@@ -107,12 +107,12 @@ class SimCLR(object):
             if epoch_counter >= 10:
                 self.scheduler.step()
             logging.debug(
-                f"Epoch: {epoch_counter}\tLoss: {loss}\tTop1 accuracy: {top1[0]}"
+                "Epoch: {}\tLoss: {}\tTop1 accuracy: {}".format(epoch_counter, loss, top1[0])
             )
 
         logging.info("Training has finished.")
         # save model checkpoints
-        checkpoint_name = "checkpoint_{:04d}.pth.tar".format(self.args.epochs)
+        checkpoint_name = "checkpoint_{}_{}_{:04d}.pth.tar".format(self.args.dataset_name, self.args.arch, self.args.epochs)
         save_checkpoint(
             {
                 "epoch": self.args.epochs,
@@ -124,5 +124,5 @@ class SimCLR(object):
             filename=os.path.join(self.writer.log_dir, checkpoint_name),
         )
         logging.info(
-            f"Model checkpoint and metadata has been saved at {self.writer.log_dir}."
+            "Model checkpoint and metadata has been saved at {}.".format(self.writer.log_dir)
         )
