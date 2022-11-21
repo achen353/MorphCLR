@@ -20,7 +20,15 @@ class SimCLR(object):
         self.scheduler = kwargs["scheduler"]
         self.writer = SummaryWriter()
         logging.basicConfig(
-            filename=os.path.join(self.writer.log_dir, "sep_{}_{}_{}_{:04d}_training.log".format("Y" if self.args.use_pretrained else "N", self.args.dataset_name, self.args.arch, self.args.epochs)),
+            filename=os.path.join(
+                self.writer.log_dir,
+                "sep_{}_{}_{}_{:04d}_training.log".format(
+                    "Y" if self.args.use_pretrained else "N",
+                    self.args.dataset_name,
+                    self.args.arch,
+                    self.args.epochs,
+                ),
+            ),
             level=logging.DEBUG,
         )
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
@@ -107,12 +115,19 @@ class SimCLR(object):
             if epoch_counter >= 10:
                 self.scheduler.step()
             logging.debug(
-                "Epoch: {}\tLoss: {}\tTop1 accuracy: {}".format(epoch_counter, loss, top1[0])
+                "Epoch: {}\tLoss: {}\tTop1 accuracy: {}".format(
+                    epoch_counter, loss, top1[0]
+                )
             )
 
         logging.info("Training has finished.")
         # save model checkpoints
-        checkpoint_name = "checkpoint_sep_{}_{}_{}_{:04d}.pth.tar".format("Y" if self.args.use_pretrained else "N", self.args.dataset_name, self.args.arch, self.args.epochs)
+        checkpoint_name = "checkpoint_sep_{}_{}_{}_{:04d}.pth.tar".format(
+            "Y" if self.args.use_pretrained else "N",
+            self.args.dataset_name,
+            self.args.arch,
+            self.args.epochs,
+        )
         save_checkpoint(
             {
                 "epoch": self.args.epochs,
@@ -124,5 +139,7 @@ class SimCLR(object):
             filename=os.path.join(self.writer.log_dir, checkpoint_name),
         )
         logging.info(
-            "Model checkpoint and metadata has been saved at {}.".format(self.writer.log_dir)
+            "Model checkpoint and metadata has been saved at {}.".format(
+                self.writer.log_dir
+            )
         )
