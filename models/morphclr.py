@@ -6,11 +6,11 @@ from exceptions.exceptions import InvalidBackboneError
 
 
 class MorphCLR(nn.Module):
-    def __init__(self, base_model, out_dim):
+    def __init__(self, base_model, out_dim, use_pretrained):
         super(MorphCLR, self).__init__()
         self.resnet_dict = {
-            "resnet18": models.resnet18(pretrained=True),
-            "resnet50": models.resnet50(pretrained=True),
+            "resnet18": models.resnet18(pretrained=use_pretrained),
+            "resnet50": models.resnet50(pretrained=use_pretrained),
         }
 
         self.backbone_1 = self._get_basemodel(base_model)
