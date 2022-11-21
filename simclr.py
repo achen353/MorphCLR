@@ -21,7 +21,15 @@ class SimCLR(object):
         self.scheduler = kwargs["scheduler"]
         self.writer = SummaryWriter()
         logging.basicConfig(
-            filename=os.path.join(self.writer.log_dir, "{}_{}_{:04d}_training.log".format(self.args.dataset_name, self.args.arch, self.args.epochs)),
+            filename=os.path.join(
+                self.writer.log_dir,
+                "{}_{}_{}_{:04d}_training.log".format(
+                    "Y" if self.args.use_pretrained else "N",
+                    self.args.dataset_name,
+                    self.args.arch,
+                    self.args.epochs,
+                ),
+            ),
             level=logging.DEBUG,
         )
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
@@ -84,7 +92,10 @@ class SimCLR(object):
                     images = torch.cat(images, dim=0)
                     images = images.to(self.args.device)
                 else:
-                    edge_images, non_edge_images = images_and_labels[0], images_and_labels[1]
+                    edge_images, non_edge_images = (
+                        images_and_labels[0],
+                        images_and_labels[1],
+                    )
                     edge_images = torch.cat(edge_images, dim=0)
                     non_edge_images = torch.cat(non_edge_images, dim=0)
                     images = torch.stack([edge_images, non_edge_images], dim=0)
@@ -117,12 +128,19 @@ class SimCLR(object):
             if epoch_counter >= 10:
                 self.scheduler.step()
             logging.debug(
-                "Epoch: {}\tLoss: {}\tTop1 accuracy: {}".format(epoch_counter, loss, top1[0])
+                "Epoch: {}\tLoss: {}\tTop1 accuracy: {}".format(
+                    epoch_counter, loss, top1[0]
+                )
             )
 
         logging.info("Training has finished.")
         # save model checkpoints
-        checkpoint_name = "checkpoint_{}_{}_{:04d}.pth.tar".format(self.args.dataset_name, self.args.arch, self.args.epochs)
+        checkpoint_name = "checkpoint_{}_{}_{}_{:04d}.pth.tar".format(
+            "Y" if self.args.use_pretrained else "N",
+            self.args.dataset_name,
+            self.args.arch,
+            self.args.epochs,
+        )
         save_checkpoint(
             {
                 "epoch": self.args.epochs,
@@ -134,5 +152,7 @@ class SimCLR(object):
             filename=os.path.join(self.writer.log_dir, checkpoint_name),
         )
         logging.info(
-            "Model checkpoint and metadata has been saved at {}.".format(self.writer.log_dir)
+            "Model checkpoint and metadata has been saved at {}.".format(
+                self.writer.log_dir
+            )
         )
