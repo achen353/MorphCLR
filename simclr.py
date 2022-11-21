@@ -20,7 +20,7 @@ class SimCLR(object):
         self.scheduler = kwargs["scheduler"]
         self.writer = SummaryWriter()
         logging.basicConfig(
-            filename=os.path.join(self.writer.log_dir, "sep_{}_{}_{:04d}_training.log".format(self.args.dataset_name, self.args.arch, self.args.epochs)),
+            filename=os.path.join(self.writer.log_dir, "sep_{}_{}_{}_{:04d}_training.log".format("Y" if self.args.use_pretrained else "N", self.args.dataset_name, self.args.arch, self.args.epochs)),
             level=logging.DEBUG,
         )
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
@@ -112,7 +112,7 @@ class SimCLR(object):
 
         logging.info("Training has finished.")
         # save model checkpoints
-        checkpoint_name = "checkpoint_sep_{}_{}_{:04d}.pth.tar".format(self.args.dataset_name, self.args.arch, self.args.epochs)
+        checkpoint_name = "checkpoint_sep_{}_{}_{}_{:04d}.pth.tar".format("Y" if self.args.use_pretrained else "N", self.args.dataset_name, self.args.arch, self.args.epochs)
         save_checkpoint(
             {
                 "epoch": self.args.epochs,
