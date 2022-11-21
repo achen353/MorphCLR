@@ -26,3 +26,4 @@ torchvision
 numpy
 opencv-python
 pillow
+kornia

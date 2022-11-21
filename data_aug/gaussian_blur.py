@@ -41,6 +41,11 @@ class GaussianBlur(object):
     def __call__(self, img):
         img = self.pil_to_tensor(img).unsqueeze(0)
 
+        # The image should be of size [batch_size, channels, width, height] = [1, 3, width, height]
+        if img.shape[1] == 1:
+            # If the image is of grayscale, repeat the dimension to create 3 channels
+            img = img.repeat(1, 3, 1, 1)
+
         sigma = np.random.uniform(0.1, 2.0)
         x = np.arange(-self.r, self.r + 1)
         x = np.exp(-np.power(x, 2) / (2 * sigma * sigma))
@@ -49,7 +54,7 @@ class GaussianBlur(object):
 
         self.blur_h.weight.data.copy_(x.view(3, 1, self.k, 1))
         self.blur_v.weight.data.copy_(x.view(3, 1, 1, self.k))
-
+        # print(img.shape)
         with torch.no_grad():
             img = self.blur(img)
             img = img.squeeze()

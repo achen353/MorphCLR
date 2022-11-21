@@ -6,14 +6,13 @@ import os
 import cv2
 import numpy as np
 import torch
-from torchvision import transforms, datasets
+from torchvision import datasets
 
 
 root_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.append(root_path)
 
-from DexiNed.model_inference import model_process, pre_process
-from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset
+from DexiNed.model_inference import model_process
 
 class DexinedAug(object):
     """
