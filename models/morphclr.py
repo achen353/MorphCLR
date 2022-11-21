@@ -9,19 +9,28 @@ class MorphCLR(nn.Module):
     def __init__(self, base_model, out_dim):
         super(MorphCLR, self).__init__()
         self.resnet_dict = {
-            "resnet18": models.resnet18(pretrained=False, num_classes=out_dim),
-            "resnet50": models.resnet50(pretrained=False, num_classes=out_dim),
+            "resnet18": models.resnet18(pretrained=True),
+            "resnet50": models.resnet50(pretrained=True),
         }
 
-        self.backbone = self._get_basemodel(base_model)
+        self.backbone_1 = self._get_basemodel(base_model)
+        self.backbone_2 = self._get_basemodel(base_model)
+ 
+        # # Freeze gradients of the resnet for extra sanity
+        # for x in self.backbone_1.parameters():
+        #     x.requires_grad = False
+        # for x in self.backbone_2.parameters():
+        #     x.requires_grad = False
 
-        # Freeze gradients of the resnet for extra sanity
-        for x in self.backbone.parameters():
-            x.requires_grad = False
+        dim_mlp = self.backbone_1.fc.in_features
+        self.backbone_1.fc = nn.Identity()
+        self.backbone_2.fc = nn.Identity()
 
-        dim_mlp = self.backbone.fc.out_features
-
-        self.test_variable = nn.Parameter(torch.randn(dim_mlp))
+        self.proj_layer = nn.Sequential(
+            nn.Linear(dim_mlp * 2, dim_mlp * 2),
+            nn.ReLU(),
+            nn.Linear(dim_mlp * 2, out_dim)
+        )
 
     def _get_basemodel(self, model_name):
         try:
@@ -33,13 +42,10 @@ class MorphCLR(nn.Module):
         else:
             return model
 
-    def get_parameters(self):
-        # only provide parameters of stuff that isn't backbone/resnet
-        return [
-            self.test_variable,
-        ]
-
     def forward(self, x):
-        # print("#### test variable ####\n", self.test_variable)
-        # print("#### backbone variable ####\n", self.backbone.fc.weight)
-        return self.backbone(x) + self.test_variable[None, :]
+        # x is a stacked tensor of shape [2, batch_size, channel, width, length]
+        x_1, x_2 = x[0], x[1]
+        x_1, x_2 = self.backbone_1(x_1), self.backbone_2(x_2)
+        x_cat = torch.cat([x_1, x_2], 1)
+        x_proj = self.proj_layer(x_cat)
+        return x_proj
