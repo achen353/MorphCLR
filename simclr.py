@@ -24,8 +24,8 @@ class SimCLR(object):
             filename=os.path.join(
                 self.writer.log_dir,
                 "{}_{}_{}_{:04d}_training.log".format(
-                    "Y" if self.args.use_pretrained else "N",
                     self.args.dataset_name,
+                    "pretrained" if self.args.use_pretrained else "random",
                     self.args.arch,
                     self.args.epochs,
                 ),
@@ -136,8 +136,8 @@ class SimCLR(object):
         logging.info("Training has finished.")
         # save model checkpoints
         checkpoint_name = "checkpoint_{}_{}_{}_{:04d}.pth.tar".format(
-            "Y" if self.args.use_pretrained else "N",
             self.args.dataset_name,
+            "pretrained" if self.args.use_pretrained else "random",
             self.args.arch,
             self.args.epochs,
         )

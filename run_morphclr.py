@@ -3,8 +3,7 @@ import torch
 import torch.backends.cudnn as cudnn
 from torchvision import models
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset
-from models.resnet_simclr import ResNetSimCLR
-from models.morphclr import MorphCLRSingle
+from models.morphclr import MorphCLRSingle, MorphCLRDual
 from simclr import SimCLR
 
 import warnings
@@ -139,9 +138,14 @@ def main():
         drop_last=True,
     )
 
-    model = MorphCLRSingle(
-        base_model=args.arch, out_dim=args.out_dim, use_pretrained=args.use_pretrained
-    )
+    if not args.dataset_name.endswith("dual"):
+        model = MorphCLRSingle(
+            base_model=args.arch, out_dim=args.out_dim, use_pretrained=args.use_pretrained
+        )
+    else:
+        model = MorphCLRDual(
+            base_model=args.arch, out_dim=args.out_dim, use_pretrained=args.use_pretrained
+        )
 
     optimizer = torch.optim.Adam(
         model.parameters(), args.lr, weight_decay=args.weight_decay

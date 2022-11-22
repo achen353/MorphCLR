@@ -44,7 +44,18 @@ class ContrastiveLearningDataset:
                 ),
                 download=True,
             ),
-            "stl10_canny": lambda: DualDataset(
+            "stl10_canny": lambda: CannyDataset(
+                root=self.root_folder,
+                transform=ContrastiveLearningViewGenerator(
+                    self.get_simclr_pipeline_transform(96), n_views
+                ),
+            ),
+            "stl10_dexined": lambda: DexiNedUnlabeledDataset(
+                transform=ContrastiveLearningViewGenerator(
+                    self.get_simclr_pipeline_transform(96), n_views
+                ),
+            ),
+            "stl10_canny_dual": lambda: DualDataset(
                 CannyDataset(
                     root=self.root_folder,
                     split="unlabeled",
@@ -61,7 +72,7 @@ class ContrastiveLearningDataset:
                     download=True,
                 )
             ),
-            "stl10_dexined": lambda: DualDataset(
+            "stl10_dexined_dual": lambda: DualDataset(
                 DexiNedUnlabeledDataset(
                     transform=ContrastiveLearningViewGenerator(
                         self.get_simclr_pipeline_transform(96), n_views
