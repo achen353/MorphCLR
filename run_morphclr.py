@@ -3,11 +3,11 @@ import torch
 import torch.backends.cudnn as cudnn
 from torchvision import models
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset
-from models.resnet_simclr import ResNetSimCLR
-from models.morphclr import MorphCLR
+from models.morphclr import MorphCLRSingle, MorphCLRDual
 from simclr import SimCLR
 
 import warnings
+
 warnings.filterwarnings("ignore")
 
 model_names = sorted(
@@ -21,7 +21,10 @@ parser.add_argument(
     "-data", metavar="DIR", default="./datasets", help="path to dataset"
 )
 parser.add_argument(
-    "-dataset-name", default="stl10", help="dataset name", choices=["stl10", "cifar10", "stl10_canny", "stl10_dexined"]
+    "-dataset-name",
+    default="stl10",
+    help="dataset name",
+    choices=["stl10", "cifar10", "stl10_canny", "stl10_dexined", "stl10_canny_dual", "stl10_dexined_dual"],
 )
 parser.add_argument(
     "-a",
@@ -100,6 +103,12 @@ parser.add_argument(
     help="Number of views for contrastive learning training.",
 )
 parser.add_argument("--gpu-index", default=0, type=int, help="Gpu index.")
+parser.add_argument(
+    "--use-pretrained",
+    default=False,
+    action="store_true",
+    help="Use pretrained weights or not.",
+)
 
 
 def main():
@@ -129,10 +138,17 @@ def main():
         drop_last=True,
     )
 
-    model = MorphCLR(base_model=args.arch, out_dim=args.out_dim)
+    if not args.dataset_name.endswith("dual"):
+        model = MorphCLRSingle(
+            base_model=args.arch, out_dim=args.out_dim, use_pretrained=args.use_pretrained
+        )
+    else:
+        model = MorphCLRDual(
+            base_model=args.arch, out_dim=args.out_dim, use_pretrained=args.use_pretrained
+        )
 
     optimizer = torch.optim.Adam(
-        model.get_parameters(), args.lr, weight_decay=args.weight_decay
+        model.parameters(), args.lr, weight_decay=args.weight_decay
     )
 
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
