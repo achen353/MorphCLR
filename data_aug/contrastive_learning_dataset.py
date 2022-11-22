@@ -46,6 +46,7 @@ class ContrastiveLearningDataset:
             ),
             "stl10_canny": lambda: CannyDataset(
                 root=self.root_folder,
+                split="unlabeled",
                 transform=ContrastiveLearningViewGenerator(
                     self.get_simclr_pipeline_transform(96), n_views
                 ),
