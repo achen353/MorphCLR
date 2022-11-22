@@ -4,9 +4,9 @@ import torchvision.models as models
 from exceptions.exceptions import InvalidBackboneError
 
 
-class MorphCLR(nn.Module):
+class MorphCLRSingle(nn.Module):
     def __init__(self, base_model, out_dim, use_pretrained):
-        super(MorphCLR, self).__init__()
+        super(MorphCLRSingle, self).__init__()
         self.resnet_dict = {
             "resnet18": models.resnet18(pretrained=use_pretrained),
             "resnet50": models.resnet50(pretrained=use_pretrained),

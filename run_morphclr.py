@@ -4,7 +4,7 @@ import torch.backends.cudnn as cudnn
 from torchvision import models
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset
 from models.resnet_simclr import ResNetSimCLR
-from models.morphclr import MorphCLR
+from models.morphclr import MorphCLRSingle
 from simclr import SimCLR
 
 import warnings
@@ -139,7 +139,7 @@ def main():
         drop_last=True,
     )
 
-    model = MorphCLR(
+    model = MorphCLRSingle(
         base_model=args.arch, out_dim=args.out_dim, use_pretrained=args.use_pretrained
     )
 
