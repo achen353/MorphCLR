@@ -25,7 +25,7 @@ parser.add_argument(
     "-dataset-name",
     default="stl10",
     help="dataset name",
-    choices=["stl10", "cifar10", "stl10_canny", "stl10_dexined"],
+    choices=["stl10", "cifar10", "stl10_canny", "stl10_dexined", "stl10_canny_dual", "stl10_dexined_dual"],
 )
 parser.add_argument(
     "-a",

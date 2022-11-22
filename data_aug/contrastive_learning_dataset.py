@@ -3,7 +3,7 @@ from data_aug.gaussian_blur import GaussianBlur
 from torchvision import transforms, datasets
 from data_aug.view_generator import ContrastiveLearningViewGenerator
 from exceptions.exceptions import InvalidDatasetSelection
-from Edge_images.generate_datasets import CannyDataset, DexiNedUnlabeledDataset
+from Edge_images.generate_datasets import DualDataset, CannyDataset, STL10, DexiNedUnlabeledDataset
 
 
 class ContrastiveLearningDataset:
@@ -44,16 +44,37 @@ class ContrastiveLearningDataset:
                 ),
                 download=True,
             ),
-            "stl10_canny": lambda: CannyDataset(
-                root=self.root_folder,
-                transform=ContrastiveLearningViewGenerator(
-                    self.get_simclr_pipeline_transform(96), n_views
+            "stl10_canny": lambda: DualDataset(
+                CannyDataset(
+                    root=self.root_folder,
+                    split="unlabeled",
+                    transform=ContrastiveLearningViewGenerator(
+                        self.get_simclr_pipeline_transform(96), n_views
+                    )
                 ),
+                STL10(
+                    self.root_folder,
+                    split="unlabeled",
+                    transform=ContrastiveLearningViewGenerator(
+                        self.get_simclr_pipeline_transform(96), n_views
+                    ),
+                    download=True,
+                )
             ),
-            "stl10_dexined": lambda: DexiNedUnlabeledDataset(
-                transform=ContrastiveLearningViewGenerator(
-                    self.get_simclr_pipeline_transform(96), n_views
+            "stl10_dexined": lambda: DualDataset(
+                DexiNedUnlabeledDataset(
+                    transform=ContrastiveLearningViewGenerator(
+                        self.get_simclr_pipeline_transform(96), n_views
+                    ),
                 ),
+                STL10(
+                    self.root_folder,
+                    split="unlabeled",
+                    transform=ContrastiveLearningViewGenerator(
+                        self.get_simclr_pipeline_transform(96), n_views
+                    ),
+                    download=True,
+                )
             )
         }
 

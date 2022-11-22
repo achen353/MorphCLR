@@ -8,6 +8,7 @@ from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from utils import save_config_file, accuracy, save_checkpoint
+from Edge_images.generate_datasets import DualDataset
 
 torch.manual_seed(0)
 
@@ -22,7 +23,7 @@ class SimCLR(object):
         logging.basicConfig(
             filename=os.path.join(
                 self.writer.log_dir,
-                "sep_{}_{}_{}_{:04d}_training.log".format(
+                "{}_{}_{}_{:04d}_training.log".format(
                     "Y" if self.args.use_pretrained else "N",
                     self.args.dataset_name,
                     self.args.arch,
@@ -82,11 +83,23 @@ class SimCLR(object):
         logging.info("Start SimCLR training for {} epochs.".format(self.args.epochs))
         logging.info("Training with gpu: {}.".format(self.args.disable_cuda))
 
-        for epoch_counter in range(self.args.epochs):
-            for images, _ in tqdm(train_loader):
-                images = torch.cat(images, dim=0)
+        is_dual_dataset = type(train_loader.dataset) == DualDataset
 
-                images = images.to(self.args.device)
+        for epoch_counter in range(self.args.epochs):
+            for images_and_labels in tqdm(train_loader):
+                if not is_dual_dataset:
+                    images = images_and_labels[0]
+                    images = torch.cat(images, dim=0)
+                    images = images.to(self.args.device)
+                else:
+                    edge_images, non_edge_images = (
+                        images_and_labels[0],
+                        images_and_labels[1],
+                    )
+                    edge_images = torch.cat(edge_images, dim=0)
+                    non_edge_images = torch.cat(non_edge_images, dim=0)
+                    images = torch.stack([edge_images, non_edge_images], dim=0)
+                    images = images.to(self.args.device)
 
                 with autocast(enabled=self.args.fp16_precision):
                     features = self.model(images)
@@ -122,7 +135,7 @@ class SimCLR(object):
 
         logging.info("Training has finished.")
         # save model checkpoints
-        checkpoint_name = "checkpoint_sep_{}_{}_{}_{:04d}.pth.tar".format(
+        checkpoint_name = "checkpoint_{}_{}_{}_{:04d}.pth.tar".format(
             "Y" if self.args.use_pretrained else "N",
             self.args.dataset_name,
             self.args.arch,
