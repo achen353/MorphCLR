@@ -24,7 +24,14 @@ parser.add_argument(
     "-dataset-name",
     default="stl10",
     help="dataset name",
-    choices=["stl10", "cifar10", "stl10_canny", "stl10_dexined", "stl10_canny_dual", "stl10_dexined_dual"],
+    choices=[
+        "stl10",
+        "cifar10",
+        "stl10_canny_single",
+        "stl10_dexined_single",
+        "stl10_canny_dual",
+        "stl10_dexined_dual",
+    ],
 )
 parser.add_argument(
     "-a",
@@ -140,11 +147,15 @@ def main():
 
     if not args.dataset_name.endswith("dual"):
         model = MorphCLRSingle(
-            base_model=args.arch, out_dim=args.out_dim, use_pretrained=args.use_pretrained
+            base_model=args.arch,
+            out_dim=args.out_dim,
+            use_pretrained=args.use_pretrained,
         )
     else:
         model = MorphCLRDual(
-            base_model=args.arch, out_dim=args.out_dim, use_pretrained=args.use_pretrained
+            base_model=args.arch,
+            out_dim=args.out_dim,
+            use_pretrained=args.use_pretrained,
         )
 
     optimizer = torch.optim.Adam(
