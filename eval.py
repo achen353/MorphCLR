@@ -21,8 +21,12 @@ from torchvision import datasets, models
 from tqdm import tqdm
 from transformers import ViTFeatureExtractor
 
-from Edge_images.generate_datasets import (STL10, CannyDataset,
-                                           DexiNedTestDataset, DualDataset)
+from Edge_images.generate_datasets import (
+    STL10,
+    CannyDataset,
+    DexiNedTestDataset,
+    DualDataset,
+)
 from models.morphclr import MorphCLRDualEval, MorphCLRSingleEval
 from vit import VIT_pretrained
 
@@ -127,10 +131,26 @@ def compute_accuracies_local(model, device, data_loader, model_type=ModelType.SI
     model = model.eval()
     model = model.to(device)
     accuracies = defaultdict(int)
-    for data, target in tqdm(data_loader):
+    # Loop over all examples in test set
+    for data_and_target in tqdm(data_loader):
         # Send the data and label to the device
         if model_type == ModelType.VIT:
+            data, target = data_and_target
             data = data["pixel_values"][0]
+        elif (
+            model_type == ModelType.MORPHCLRSINGLE
+            or model_type == ModelType.MORPHCLRDUAL
+        ):
+            edge_data, non_edge_data, target = data_and_target
+            if len(edge_data.shape) == 3:
+                edge_data = edge_data.unsqueeze(1)
+            # If the image is of grayscale, repeat the dimension to create 3 channels
+            if edge_data.shape[1] == 1:
+                edge_data = edge_data.repeat(1, 3, 1, 1)
+            data = torch.stack([edge_data, non_edge_data], dim=0)
+            target = target.flatten()
+        else:
+            data, target = data_and_target
         data, target = data.to(device), target.to(device)
 
         # Forward pass the data through the model
@@ -318,13 +338,13 @@ def get_stl10_dexined_dual_data_loader(
 
 
 # FGSM attack code
-def fgsm_attack(image, epsilon, data_grad):
+def fgsm_attack(image, epsilon, data_grad, is_canny=False):
     # Collect the element-wise sign of the data gradient
     sign_data_grad = data_grad.sign()
     # Create the perturbed image by adjusting each pixel of the input image
     perturbed_image = image + epsilon * sign_data_grad
     # Adding clipping to maintain [0,1] range
-    perturbed_image = torch.clamp(perturbed_image, 0, 1)
+    perturbed_image = torch.clamp(perturbed_image, 0, 1 if not is_canny else 255)
     # Return the perturbed image
     return perturbed_image
 
@@ -388,7 +408,8 @@ def test_adversarial(
         data_grad = data.grad.data
 
         # Call FGSM Attack
-        perturbed_data = fgsm_attack(data, epsilon, data_grad)
+        is_canny = type(test_loader.dataset.dataset1) == CannyDataset
+        perturbed_data = fgsm_attack(data, epsilon, data_grad, is_canny)
 
         # Re-classify the perturbed image
         output = model(perturbed_data)
@@ -422,14 +443,26 @@ def test_adversarial(
 
 
 def compute_adversarial_accuracies(
-    adv_epsilons, model, device, test_loader, model_type=ModelType.SIMCLR
+    adv_epsilons,
+    model,
+    device,
+    test_loader,
+    model_name,
+    model_type=ModelType.SIMCLR,
 ):
     print("[INFO] Computing adversarial accuracies and epsilons.")
+    result_root = "./adv_results"
+
+    if not os.path.exists(result_root):
+        os.makedirs(result_root)
 
     adv_accuracies = []
     adv_examples = []
 
     criterion = torch.nn.CrossEntropyLoss().to(device)
+
+    with open(os.path.join(result_root, "{}.csv".format(model_name)), "a") as f:
+        f.write("eps,acc\n")
 
     # Run test for each epsilon
     for eps in adv_epsilons:
@@ -438,6 +471,20 @@ def compute_adversarial_accuracies(
         )
         adv_accuracies.append(acc)
         adv_examples.append(ex)
+        with open(os.path.join(result_root, "{}.csv".format(model_name)), "a") as f:
+            f.write("{},{}\n".format(eps, acc))
+
+    plt.figure(figsize=(5, 5))
+    plt.plot(adv_epsilons, adv_accuracies, "*-")
+    plt.yticks(np.arange(0, 1.1, step=0.1))
+    plt.xticks(np.arange(0, 0.06, step=0.01))
+    plt.title("Accuracy vs Epsilon")
+    plt.xlabel("Epsilon")
+    plt.ylabel("Accuracy")
+    plt.savefig(
+        os.path.join(result_root, "{}.png".format(model_name)), bbox_inches="tight"
+    )
+
     return adv_accuracies, adv_examples
 
 
@@ -511,6 +558,7 @@ def main():
 
     print("[INFO] Model checkpoint loaded.")
 
+    # Evaluate for standard STL10 accuracies
     test = get_dataloader_fn(data_root=args.data, download=True, batch_size=32)
     stl10_accuracies = compute_accuracies_local(
         model,
@@ -518,6 +566,7 @@ def main():
         test,
     )
 
+    # Evaluate for stylized STL10 accuracies
     stl10_stylized = stylized_stl10_dataset(stylized_folder_path)
     stylized_loader = DataLoader(
         stl10_stylized,
@@ -526,12 +575,19 @@ def main():
         drop_last=False,
         shuffle=True,
     )
-    stl10_stylized_metrics = compute_accuracy_and_ratio(model, args.device, stylized_loader)
+    stl10_stylized_metrics = compute_accuracy_and_ratio(
+        model, args.device, stylized_loader
+    )
 
     # Evaluate for adversarial accuracies
     test = get_dataloader_fn(data_root=args.data, download=False, batch_size=1)
     compute_adversarial_accuracies(
-        [0, 0.01, 0.02, 0.03, 0.04, 0.05], model, args.device, test, model_type
+        [0, 0.01, 0.02, 0.03, 0.04, 0.05],
+        model,
+        args.device,
+        test,
+        args.checkpoint.split(".")[0],
+        model_type,
     )
 
     # model = VIT_pretrained("VIT_checkpoints/VIT_5_epochs.pt", device=device)
