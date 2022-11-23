@@ -69,8 +69,8 @@ class MorphCLRSingleEval(MorphCLRBase):
     def __init__(
         self,
         base_model,
-        edge_checkpoint_file_path,
-        non_edge_checkpoint_file_path,
+        edge_checkpoint_file_path=None,
+        non_edge_checkpoint_file_path=None,
         device="cpu",
     ):
         super().__init__(use_pretrained=False)
@@ -85,7 +85,7 @@ class MorphCLRSingleEval(MorphCLRBase):
         self.to(self.device)
 
     def _load_checkpoint(
-        self, edge_checkpoint_file_path=None, non_edge_checkpoint_file_path=None
+        self, edge_checkpoint_file_path, non_edge_checkpoint_file_path
     ):
         # Load edge checkpoint
         edge_checkpoint = torch.load(
