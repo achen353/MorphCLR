@@ -1,42 +1,104 @@
-import torch
-from torch import cuda
-import sys
-import numpy as np
+import argparse
 import os
+import shutil
+import sys
+import warnings
+from collections import defaultdict
+from enum import Enum
+
+import gdown
 import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import torch.backends.cudnn as cudnn
+import torch.nn.functional as F
 import torchvision
-from PIL import Image
-
-from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
-from torchvision import datasets
-
+from PIL import Image
+from torch import cuda
+from torch.utils.data import DataLoader
+from torchvision import datasets, models
+from tqdm import tqdm
 from transformers import ViTFeatureExtractor
 
+from Edge_images.generate_datasets import (STL10, CannyDataset,
+                                           DexiNedTestDataset, DualDataset)
+from models.morphclr import MorphCLRDualEval, MorphCLRSingleEval
 from vit import VIT_pretrained
-
-from tqdm import tqdm
-import gdown
-import shutil
-
-import torch.nn.functional as F
-
-import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-convert_tensor = torchvision.transforms.ToTensor()
+convert_tensor_fn = torchvision.transforms.ToTensor()
 
-model_type = "google/vit-base-patch16-224-in21k"
-feature_extractor = ViTFeatureExtractor.from_pretrained(model_type)
+vit_model_type = "google/vit-base-patch16-224-in21k"
+feature_extractor = ViTFeatureExtractor.from_pretrained(vit_model_type)
 
-simclr_type = "simclr"
-vit_type = "vit"
 
-from collections import defaultdict
-from Edge_images.generate_datasets import DualDataset
+class ModelType(Enum):
+    SIMCLR = 1
+    MORPHCLRSINGLE = 2
+    MORPHCLRDUAL = 3
+    VIT = 4
 
-# def get_local_dataset(source_dir, model_type = simclr_type):
+
+torch_model_names = sorted(
+    name
+    for name in models.__dict__
+    if name.islower() and not name.startswith("__") and callable(models.__dict__[name])
+)
+
+parser = argparse.ArgumentParser(description="PyTorch SimCLR")
+parser.add_argument(
+    "-data", metavar="DIR", default="./datasets", help="path to dataset"
+)
+parser.add_argument(
+    "-dataset-name",
+    default="stl10",
+    help="dataset name",
+    choices=[
+        "stl10",
+        "stl10_canny",
+        "stl10_dexined",
+    ],
+)
+parser.add_argument(
+    "-a",
+    "--arch",
+    metavar="ARCH",
+    default="resnet18",
+    choices=torch_model_names,
+    help="model architecture: "
+    + " | ".join(torch_model_names)
+    + " (default: resnet18)",
+)
+parser.add_argument(
+    "-m",
+    "--model-type",
+    default="simclr",
+    choices=["simclr", "morphclr_single", "morphclr_dual", "vit"],
+    help="model type: simclr, morphclr_single, morphclr_dual, or vit",
+)
+parser.add_argument(
+    "-c",
+    "--checkpoint",
+    default="simclr_resnet50_50-epochs_stl10_100-epochs.pt",
+    type=str,
+    help="file name of the checkpoint",
+)
+parser.add_argument(
+    "-b",
+    "--batch-size",
+    default=256,
+    type=int,
+    metavar="N",
+    help="mini-batch size (default: 256), this is the total "
+    "batch size of all GPUs on the current node when "
+    "using Data Parallel or Distributed Data Parallel",
+)
+parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
+parser.add_argument("--gpu-index", default=0, type=int, help="Gpu index.")
+
+# def get_local_dataset(source_dir, model_type=ModelType.SIMCLR):
 #     # assumes that source dir contains folders of images where each folder of images
 #     # has images from the same class whose name is the name of the folder
 #     # e.g dir/0 (label) / img_x.png
@@ -47,10 +109,10 @@ from Edge_images.generate_datasets import DualDataset
 #         labels.append(int(source_path) - 1)
 #         source_example_path = sorted(os.listdir(os.path.join(source_dir, source_path)))
 #         source_example_path = [os.path.join(source_dir, source_path, x) for x in source_example_path]
-#         tensor_examples = [convert_tensor(Image.open(x).convert('RGB')) for x in source_example_path]
-#         if model_type == simclr_type:
+#         tensor_examples = [convert_tensor_fn(Image.open(x).convert('RGB')) for x in source_example_path]
+#         if model_type == ModelType.SIMCLR:
 #             original_tensors = torch.stack(tensor_examples)
-#         elif model_type == vit_type:
+#         elif model_type == ModelType.VIT:
 #             vit_extracted = feature_extractor(tensor_examples, return_tensors = "pt")
 #             original_tensors = vit_extracted['pixel_values']
 
@@ -60,14 +122,14 @@ from Edge_images.generate_datasets import DualDataset
 # class stylized_dataset(torch.utils.data.dataset):
 
 
-def compute_accuracies_local(model, device, data_loader, model_type=simclr_type):
+def compute_accuracies_local(model, device, data_loader, model_type=ModelType.SIMCLR):
     # logit dim equals number of classes
     model = model.eval()
     model = model.to(device)
     accuracies = defaultdict(int)
     for data, target in tqdm(data_loader):
         # Send the data and label to the device
-        if model_type == vit_type:
+        if model_type == ModelType.VIT:
             data = data["pixel_values"][0]
         data, target = data.to(device), target.to(device)
 
@@ -95,7 +157,7 @@ def compute_accuracies_local(model, device, data_loader, model_type=simclr_type)
 #         content_style_labels = torch.tensor([int(source_path) - 1] * dir_style_labels.shape[0])
 #         content_labels.append(content_style_labels)
 
-#         original_tensors = torch.stack([convert_tensor(Image.open(x).convert('RGB')) for x in source_example_path])
+#         original_tensors = torch.stack([convert_tensor_fn(Image.open(x).convert('RGB')) for x in source_example_path])
 
 #         data.append(original_tensors)
 
@@ -103,7 +165,7 @@ def compute_accuracies_local(model, device, data_loader, model_type=simclr_type)
 
 
 class stylized_stl10_dataset(torch.utils.data.Dataset):
-    def __init__(self, source_dir, model_type=simclr_type):
+    def __init__(self, source_dir, model_type=ModelType.SIMCLR):
         data = []
         style_labels = []
         content_labels = []
@@ -124,14 +186,14 @@ class stylized_stl10_dataset(torch.utils.data.Dataset):
             )
             content_labels.append(content_style_labels)
             tensor_images = [
-                convert_tensor(Image.open(x).convert("RGB"))
+                convert_tensor_fn(Image.open(x).convert("RGB"))
                 for x in source_example_path
             ]
 
-            if model_type == vit_type:
+            if model_type == ModelType.VIT:
                 vit_extracted = feature_extractor(tensor_images, return_tensors="pt")
                 tensor_images = vit_extracted["pixel_values"]
-            elif model_type == simclr_type:
+            elif model_type == ModelType.SIMCLR:
                 tensor_images = torch.stack(tensor_images)
 
             data.append(tensor_images)
@@ -185,46 +247,74 @@ def compute_accuracy_and_ratio(
     return accuracies, style_decisions, content_decisions
 
 
-def get_stl10_data_loaders(
+def get_stl10_data_loader(
+    data_root,
     download,
     shuffle=False,
-    model_type=simclr_type,
+    model_type=ModelType.SIMCLR,
     batch_size=256,
-    test_loader_same_batch=False,
 ):
     print("[INFO] Preparing STL10 adversarial data loaders.")
 
-    if model_type == vit_type:
+    if model_type == ModelType.VIT:
         stl10_transform = transforms.Compose([transforms.ToTensor(), feature_extractor])
-    elif model_type == simclr_type:
+    elif model_type == ModelType.SIMCLR:
         stl10_transform = transforms.ToTensor()
-    
-    train_dataset = datasets.STL10(
-        "./datasets", split="train", download=download, transform=stl10_transform
-    )
-
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        num_workers=0,
-        drop_last=False,
-        shuffle=shuffle,
-    )
 
     test_dataset = datasets.STL10(
-        "./datasets", split="test", download=download, transform=stl10_transform
+        data_root, split="test", download=download, transform=stl10_transform
     )
 
     test_loader = DataLoader(
         test_dataset,
-        batch_size=1
-        if not test_loader_same_batch
-        else batch_size,  # batch_size = 1 instead of 2 * batch_size
+        batch_size=batch_size,
         num_workers=10,
         drop_last=False,
         shuffle=shuffle,
     )
-    return train_loader, test_loader
+    return test_loader
+
+
+def get_stl10_canny_dual_data_loader(
+    data_root, download, shuffle=False, batch_size=256, **kwarg
+):
+    test_dataset = DualDataset(
+        CannyDataset(root=data_root, split="test", transform=transforms.ToTensor()),
+        STL10(root=data_root, split="test", transform=transforms.ToTensor()),
+    )
+
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        num_workers=10,
+        drop_last=False,
+        shuffle=shuffle,
+    )
+
+    return test_loader
+
+
+def get_stl10_dexined_dual_data_loader(
+    data_root, download, shuffle=False, batch_size=256, **kwarg
+):
+    test_dataset = DualDataset(
+        DexiNedTestDataset(
+            csv_file="./Edge_images/Dexi/test/labels.csv",
+            root_dir="./Edge_images/Dexi/test",
+            transform=transforms.ToTensor(),
+        ),
+        STL10(root=data_root, split="test", transform=transforms.ToTensor()),
+    )
+
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        num_workers=10,
+        drop_last=False,
+        shuffle=shuffle,
+    )
+
+    return test_loader
 
 
 # FGSM attack code
@@ -240,7 +330,7 @@ def fgsm_attack(image, epsilon, data_grad):
 
 
 def test_adversarial(
-    model, criterion, device, test_loader, epsilon, model_type=simclr_type
+    model, criterion, device, test_loader, epsilon, model_type=ModelType.SIMCLR
 ):
     # Accuracy counter
     correct = 0
@@ -250,10 +340,25 @@ def test_adversarial(
     model.eval()
 
     # Loop over all examples in test set
-    for data, target in tqdm(test_loader):
+    for data_and_target in tqdm(test_loader):
         # Send the data and label to the device
-        if model_type == vit_type:
+        if model_type == ModelType.VIT:
+            data, target = data_and_target
             data = data["pixel_values"][0]
+        elif (
+            model_type == ModelType.MORPHCLRSINGLE
+            or model_type == ModelType.MORPHCLRDUAL
+        ):
+            edge_data, non_edge_data, target = data_and_target
+            if len(edge_data.shape) == 3:
+                edge_data = edge_data.unsqueeze(1)
+            # If the image is of grayscale, repeat the dimension to create 3 channels
+            if edge_data.shape[1] == 1:
+                edge_data = edge_data.repeat(1, 3, 1, 1)
+            data = torch.stack([edge_data, non_edge_data], dim=0)
+            target = target.flatten()
+        else:
+            data, target = data_and_target
 
         data, target = data.to(device), target.to(device)
 
@@ -317,7 +422,7 @@ def test_adversarial(
 
 
 def compute_adversarial_accuracies(
-    adv_epsilons, model, device, test_loader, model_type=simclr_type
+    adv_epsilons, model, device, test_loader, model_type=ModelType.SIMCLR
 ):
     print("[INFO] Computing adversarial accuracies and epsilons.")
 
@@ -337,6 +442,24 @@ def compute_adversarial_accuracies(
 
 
 def main():
+    args = parser.parse_args()
+    # Check if GPU is available
+    if not args.disable_cuda and torch.cuda.is_available():
+        args.device = torch.device("cuda:" + str(args.gpu_index))
+        cudnn.deterministic = True
+        cudnn.benchmark = True
+    else:
+        args.device = torch.device("cpu")
+    # Set model type
+    if args.model_type == "simclr":
+        model_type = ModelType.SIMCLR
+    elif args.model_type == "morphclr_single":
+        model_type = ModelType.MORPHCLRSINGLE
+    elif args.model_type == "morphclr_dual":
+        model_type = ModelType.MORPHCLRDUAL
+    else:
+        model_type = ModelType.VIT
+
     print("[INFO] Downloading Stylized STL10")
 
     file_id = "1aTVhLVG1pbsFWmoV-KoYB00YSPCSqyEv"
@@ -350,25 +473,48 @@ def main():
 
     print("[INFO] Starting evaluation...")
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model_path = "./checkpoints/finetune/simclr_resnet50_50-epochs_stl10_100-epochs.pt"
+    model_path = os.path.join("./checkpoints/finetune/", args.checkpoint)
 
-    print("[INFO] CUDA Device: {}".format(device))
+    print("[INFO] CUDA Device: {}".format(args.device))
     print("[INFO] Using fine-tuned checkpoint: {}".format(model_path))
 
-    model = torchvision.models.resnet18(pretrained=False, num_classes=10).to(device)
-    checkpoint = torch.load(model_path)
-    model.load_state_dict(checkpoint["model_state_dict"])
+    if model_type == ModelType.SIMCLR:
+        model = torchvision.models.resnet18(pretrained=False, num_classes=10).to(
+            args.device
+        )
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        get_dataloader_fn = get_stl10_data_loader
+    elif model_type == ModelType.MORPHCLRSINGLE:
+        model = MorphCLRSingleEval(base_model="resnet18")
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint["state_dict"])
+        if args.dataset_name.endswith("canny"):
+            get_dataloader_fn = get_stl10_canny_dual_data_loader
+        elif args.dataset_name.endswith("dexined"):
+            get_dataloader_fn = get_stl10_dexined_dual_data_loader
+        else:
+            raise Exception("Cannot use standard STL10 dataset for MorphCLR models.")
+    elif model_type == ModelType.MORPHCLRDUAL:
+        model = MorphCLRDualEval(base_model="resnet18")
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint["state_dict"])
+        if args.dataset_name.endswith("canny"):
+            get_dataloader_fn = get_stl10_canny_dual_data_loader
+        elif args.dataset_name.endswith("dexined"):
+            get_dataloader_fn = get_stl10_dexined_dual_data_loader
+        else:
+            raise Exception("Cannot use standard STL10 dataset for MorphCLR models.")
+
+    model = model.to(args.device)
     model = model.eval()
 
     print("[INFO] Model checkpoint loaded.")
 
-    train, test = get_stl10_data_loaders(
-        download=True, batch_size=32, test_loader_same_batch=True
-    )
+    test = get_dataloader_fn(data_root=args.data, download=True, batch_size=32)
     stl10_accuracies = compute_accuracies_local(
         model,
-        device,
+        args.device,
         test,
     )
 
@@ -380,23 +526,20 @@ def main():
         drop_last=False,
         shuffle=True,
     )
-    stl10_stylized_metrics = compute_accuracy_and_ratio(model, device, stylized_loader)
+    stl10_stylized_metrics = compute_accuracy_and_ratio(model, args.device, stylized_loader)
 
     # Evaluate for adversarial accuracies
-    _, test = get_stl10_data_loaders(download=False)
+    test = get_dataloader_fn(data_root=args.data, download=False, batch_size=1)
     compute_adversarial_accuracies(
-        [0, 0.01, 0.02, 0.03, 0.04, 0.05],
-        model,
-        device,
-        test,
+        [0, 0.01, 0.02, 0.03, 0.04, 0.05], model, args.device, test, model_type
     )
 
     # model = VIT_pretrained("VIT_checkpoints/VIT_5_epochs.pt", device=device)
 
-    # train, test = get_stl10_data_loaders(download=True, batch_size=32, test_loader_same_batch=True, model_type=vit_type)
-    # # stl10_accuracies = compute_accuracies_local(model, device, test, model_type=vit_type )
+    # test = get_dataloader_fn(data_root=args.data, download=True, batch_size=32, model_type=ModelType.VIT)
+    # # stl10_accuracies = compute_accuracies_local(model, device, test, model_type=ModelType.VIT)
 
-    # stl10_stylized = stylized_stl10_dataset(stylized_folder_path, model_type=vit_type)
+    # stl10_stylized = stylized_stl10_dataset(stylized_folder_path, model_type=ModelType.VIT)
     # stylized_loader = DataLoader(
     #     stl10_stylized,
     #     batch_size=32,
@@ -407,8 +550,8 @@ def main():
     # stl10_stylized_metrics = compute_accuracy_and_ratio(model, device, stylized_loader)
 
     # # Evaluate for adversarial accuracies
-    # _, test = get_stl10_data_loaders(download=False, model_type=vit_type)
-    # compute_adversarial_accuracies([0, 0.01, 0.02, 0.03, 0.04, 0.05], model, device, test, model_type=vit_type)
+    # test = get_dataloader_fn(data_root=args.data, download=False, model_type=ModelType.VIT)
+    # compute_adversarial_accuracies([0, 0.01, 0.02, 0.03, 0.04, 0.05], model, device, test, model_type=ModelType.VIT)
 
 
 if __name__ == "__main__":

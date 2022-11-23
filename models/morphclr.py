@@ -1,6 +1,6 @@
+import torch
 import torch.nn as nn
 import torchvision.models as models
-import torch
 
 from exceptions.exceptions import InvalidBackboneError
 
@@ -77,12 +77,15 @@ class MorphCLRSingleEval(MorphCLRBase):
         self.device = device
         self.edge_model = self._get_basemodel(base_model)
         self.non_edge_model = self._get_basemodel(base_model)
-        self._load_checkpoint(edge_checkpoint_file_path, non_edge_checkpoint_file_path)
+        if edge_checkpoint_file_path and non_edge_checkpoint_file_path:
+            self._load_checkpoint(
+                edge_checkpoint_file_path, non_edge_checkpoint_file_path
+            )
         self._init_linear_layer()
         self.to(self.device)
 
     def _load_checkpoint(
-        self, edge_checkpoint_file_path, non_edge_checkpoint_file_path
+        self, edge_checkpoint_file_path=None, non_edge_checkpoint_file_path=None
     ):
         # Load edge checkpoint
         edge_checkpoint = torch.load(
@@ -129,12 +132,13 @@ class MorphCLRSingleEval(MorphCLRBase):
 
 
 class MorphCLRDualEval(MorphCLRBase):
-    def __init__(self, base_model, checkpoint_file_path, device="cpu"):
+    def __init__(self, base_model, checkpoint_file_path=None, device="cpu"):
         super().__init__(use_pretrained=False)
         self.device = device
         self.backbone_1 = self._get_basemodel(base_model)
         self.backbone_2 = self._get_basemodel(base_model)
-        self._load_checkpoint(checkpoint_file_path)
+        if checkpoint_file_path:
+            self._load_checkpoint(checkpoint_file_path)
         self._init_linear_layer()
         self.to(self.device)
 
