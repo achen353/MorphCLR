@@ -111,7 +111,7 @@ class DualDataset(Dataset):
     def __getitem__(self, index):
         label1 = self.dataset1[index][1]
         label2 = self.dataset2[index][1]
-        assert label1 == label2
+        assert np.array_equal(label1, label2)
         return (self.dataset1[index][0], self.dataset2[index][0], label1)
 
 
@@ -120,6 +120,82 @@ class STL10(datasets.STL10):
 
     def __init__(self, root, download=True, **kwargs):
         super().__init__(root, download=download, **kwargs)
+
+
+class StylizedSTL10Dataset(torch.utils.data.Dataset):
+    """A duplicate class for StylizedSTL10Dataset in eval.py"""
+
+    def __init__(self, source_dir, transform=None):
+        data = []
+        style_labels = []
+        content_labels = []
+        print("[INFO] Preparing stylzed images from: {}".format(source_dir))
+        for source_path in sorted(os.listdir(source_dir)):
+            source_example_path = sorted(
+                os.listdir(os.path.join(source_dir, source_path))
+            )
+            source_example_path = [
+                os.path.join(source_dir, source_path, x) for x in source_example_path
+            ]
+            dir_style_labels = torch.tensor(
+                [int(x.split("/")[-1].split("_")[3]) for x in source_example_path]
+            )
+            style_labels.append(dir_style_labels)
+            content_style_labels = torch.tensor(
+                [int(source_path) - 1] * dir_style_labels.shape[0]
+            )
+            content_labels.append(content_style_labels)
+            tensor_images = [
+                transforms.ToTensor()(Image.open(x).convert("RGB"))
+                for x in source_example_path
+            ]
+
+            tensor_images = torch.stack(tensor_images)
+
+            data.append(tensor_images)
+        data = torch.cat(data, dim=0)
+        style_labels = torch.cat(style_labels, dim=0).reshape(-1, 1)
+        content_labels = torch.cat(content_labels, dim=0).reshape(-1, 1)
+        target = torch.cat((style_labels, content_labels), dim=-1)
+
+        self.data = data
+        self.target = target
+        self.transform = transform
+
+    def __len__(self):
+        return self.data.shape[0]
+
+    def __getitem__(self, idx):
+        if self.transform:
+            d = self.data[idx].permute(1, 2, 0)
+            d = (d * 255).to(torch.uint8)
+            return self.transform(d), self.target[idx]
+
+        return self.data[idx], self.target[idx]
+
+
+class CannyStylizedDataset(StylizedSTL10Dataset):
+    def __init__(self, source_dir, transform=None, **kwargs):
+        if type(transform) == ContrastiveLearningViewGenerator:
+            transform.base_transform = transforms.Compose(
+                [CannyAug(), transforms.ToPILImage()]
+                + transform.base_transform.transforms
+            )
+        else:
+            transform = transforms.Compose(
+                [CannyAug()] + (transform if transform in locals() else [])
+            )
+        super().__init__(source_dir, transform)
+
+
+class DexiNedStylizedTestDataset(DexiNedDataset):
+    def __init__(
+        self,
+        csv_file="Edge_images/Dexi_stylized/labels.csv",
+        root_dir="Edge_images/Dexi_stylized",
+        transform=None,
+    ):
+        super().__init__(csv_file, root_dir, transform)
 
 
 def preprocess_all_stl10(stl_data_path, destination_path_root, transform=DexinedAug()):
@@ -157,24 +233,57 @@ def preprocess_all_stl10(stl_data_path, destination_path_root, transform=Dexined
             edge_img = transform((edge_img * 255).to(torch.uint8))
             path_name = os.path.join(edge_split_dir, str(i) + ".png")
             labels_df.loc[i] = [str(i) + ".png", label]
-            Image.fromarray(image).save(path_name)
+            Image.fromarray(edge_img).save(path_name)
         labels_df.to_csv(os.path.join(edge_split_dir, "labels.csv"), index=False)
 
 
+def preprocess_all_stylized_stl10(
+    stylized_data_path="../stylization/inter_class_stylized_dataset",
+    destination_path_root="Dexi_stylized",
+    transform=DexinedAug(),
+):
+    """Convert all images from stl10 to edge versions and save them in the same directory"""
+    print("Provided stylized_data_path: ", stylized_data_path)
+
+    os.makedirs(destination_path_root, exist_ok=True)
+
+    print("Applying DexiNed and saving results.")
+    # Load STL10 and apply DexiNed edge detection
+    edge_dataset = StylizedSTL10Dataset(stylized_data_path)
+    # Use a data loader with pin_memory = True for faster CPU to GPU memory transfer
+    edge_data_loader = torch.utils.data.DataLoader(
+        edge_dataset,
+        num_workers=1,
+        pin_memory=True,
+    )
+    # Maintain a dataframe for image labels
+    labels_df = pd.DataFrame(columns=["image_num", "label"])
+
+    # Save edge images to directories
+    for i, (edge_img, label) in enumerate(tqdm(edge_data_loader)):
+        edge_img = edge_img[0].permute(1, 2, 0)
+        edge_img = transform((edge_img * 255).to(torch.uint8))
+        path_name = os.path.join(destination_path_root, str(i) + ".png")
+        labels_df.loc[i] = [str(i) + ".png", label.flatten()]
+        Image.fromarray(edge_img).save(path_name)
+    labels_df.to_csv(os.path.join(destination_path_root, "labels.csv"), index=False)
+
+
 if __name__ == "__main__":
-    ds = CannyDataset("./datasets")
-    ds1 = DualDataset(ds, STL10("./datasets", split="train"))
-    ds2 = DualDataset(DexiNedTrainDataset(), STL10("./datasets", split="train"))
-    import matplotlib.pyplot as plt
+    # ds = CannyDataset("./datasets")
+    # ds1 = DualDataset(ds, STL10("./datasets", split="train"))
+    # ds2 = DualDataset(DexiNedTrainDataset(), STL10("./datasets", split="train"))
+    # import matplotlib.pyplot as plt
 
-    for ds in [ds1, ds2]:
-        for image_canny, image, label in ds:
-            # display image, and image_canny on a single row
-            fig, (ax1, ax2) = plt.subplots(1, 2)
-            ax1.imshow(image_canny)
-            ax2.imshow(image)
-            print(label)
-            plt.show()
+    # for ds in [ds1, ds2]:
+    #     for image_canny, image, label in ds:
+    #         # display image, and image_canny on a single row
+    #         fig, (ax1, ax2) = plt.subplots(1, 2)
+    #         ax1.imshow(image_canny)
+    #         ax2.imshow(image)
+    #         print(label)
+    #         plt.show()
 
-            print(image_canny, image, label)
-            break
+    #         print(image_canny, image, label)
+    #         break
+    preprocess_all_stylized_stl10()

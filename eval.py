@@ -25,6 +25,8 @@ from Edge_images.generate_datasets import (
     STL10,
     CannyDataset,
     DexiNedTestDataset,
+    CannyStylizedDataset,
+    DexiNedStylizedTestDataset,
     DualDataset,
 )
 from models.morphclr import MorphCLRDualEval, MorphCLRSingleEval
@@ -173,7 +175,7 @@ def compute_accuracies_local(
     with open(file_path, "a") as f:
         f.write(
             "{},".format(model_name)
-            + ",".join([str(accuracies[i]) for i in range(10)])
+            + ",".join([str(accuracies.get(i, 0)) for i in range(10)])
             + "\n"
         )
 
@@ -230,7 +232,7 @@ class StylizedSTL10Dataset(torch.utils.data.Dataset):
             if model_type == ModelType.VIT:
                 vit_extracted = feature_extractor(tensor_images, return_tensors="pt")
                 tensor_images = vit_extracted["pixel_values"]
-            elif model_type == ModelType.SIMCLR:
+            else:
                 tensor_images = torch.stack(tensor_images)
 
             data.append(tensor_images)
@@ -249,11 +251,7 @@ class StylizedSTL10Dataset(torch.utils.data.Dataset):
         return self.data[idx], self.target[idx]
 
 
-def compute_accuracy_and_ratio(
-    model,
-    device,
-    data_loader,
-):
+def compute_accuracy_and_ratio(model, device, data_loader, model_name, model_type):
     # logit dim equals number of classes
     print("[INFO] Computing accuracy and style-based decision ratio.")
 
@@ -263,7 +261,21 @@ def compute_accuracy_and_ratio(
     accuracies = defaultdict(int)
     style_decisions = defaultdict(int)
     content_decisions = defaultdict(int)
-    for data, target in tqdm(data_loader):
+    for data_and_target in tqdm(data_loader):
+        if (
+            model_type == ModelType.MORPHCLRSINGLE
+            or model_type == ModelType.MORPHCLRDUAL
+        ):
+            edge_data, non_edge_data, target = data_and_target
+            if len(edge_data.shape) == 3:
+                edge_data = edge_data.unsqueeze(1)
+            # If the image is of grayscale, repeat the dimension to create 3 channels
+            if edge_data.shape[1] == 1:
+                edge_data = edge_data.repeat(1, 3, 1, 1)
+            data = torch.stack([edge_data, non_edge_data], dim=0)
+        else:
+            data, target = data_and_target
+
         y_style, y_content = target[:, 0], target[:, 1]
         y_style = y_style.to(device)
         y_content = y_content.to(device)
@@ -281,6 +293,26 @@ def compute_accuracy_and_ratio(
     print("# of style-based decision per class: {}".format(style_decisions))
     print("# of texture-based decision per class: {}".format(content_decisions))
 
+    file_path = "stylized_accuracies.csv"
+    if not os.path.exists(file_path):
+        with open(file_path, "a") as f:
+            f.write(
+                "exp,"
+                + ",".join(["class_{}_acc".format(i + 1) for i in range(10)])
+                + ",".join(["class_{}_style".format(i + 1) for i in range(10)])
+                + ",".join(["class_{}_content".format(i + 1) for i in range(10)])
+                + "\n"
+            )
+
+    with open(file_path, "a") as f:
+        f.write(
+            "{},".format(model_name)
+            + ",".join([str(accuracies.get(i, 0)) for i in range(10)])
+            + ",".join([str(style_decisions.get(i, 0)) for i in range(10)])
+            + ",".join([str(content_decisions.get(i, 0)) for i in range(10)])
+            + "\n"
+        )
+
     return accuracies, style_decisions, content_decisions
 
 
@@ -290,17 +322,26 @@ def get_stl10_data_loader(
     shuffle=False,
     model_type=ModelType.SIMCLR,
     batch_size=256,
+    stylization=False,
+    stylized_folder_path=None,
 ):
-    print("[INFO] Preparing STL10 data loader.")
+    if not stylization or not stylized_folder_path:
+        print("[INFO] Preparing STL10 data loader.")
 
-    if model_type == ModelType.VIT:
-        stl10_transform = transforms.Compose([transforms.ToTensor(), feature_extractor])
-    elif model_type == ModelType.SIMCLR:
-        stl10_transform = transforms.ToTensor()
+        if model_type == ModelType.VIT:
+            stl10_transform = transforms.Compose(
+                [transforms.ToTensor(), feature_extractor]
+            )
+        elif model_type == ModelType.SIMCLR:
+            stl10_transform = transforms.ToTensor()
 
-    test_dataset = datasets.STL10(
-        data_root, split="test", download=download, transform=stl10_transform
-    )
+        test_dataset = datasets.STL10(
+            data_root, split="test", download=download, transform=stl10_transform
+        )
+    else:
+        print("[INFO] Preparing stylized STL10 data loader.")
+
+        test_dataset = StylizedSTL10Dataset(stylized_folder_path)
 
     test_loader = DataLoader(
         test_dataset,
@@ -313,14 +354,35 @@ def get_stl10_data_loader(
 
 
 def get_stl10_canny_dual_data_loader(
-    data_root, download, shuffle=False, batch_size=256, **kwarg
+    data_root,
+    download,
+    shuffle=False,
+    batch_size=256,
+    model_type=ModelType.SIMCLR,
+    stylization=False,
+    stylized_folder_path=None,
+    **kwarg
 ):
-    print("[INFO] Preparing STL10 canny data loader.")
+    if not stylization or not stylized_folder_path:
+        print("[INFO] Preparing STL10 canny data loader.")
 
-    test_dataset = DualDataset(
-        CannyDataset(root=data_root, split="test", transform=transforms.ToTensor()),
-        STL10(root=data_root, split="test", transform=transforms.ToTensor()),
-    )
+        test_dataset = DualDataset(
+            CannyDataset(root=data_root, split="test", transform=transforms.ToTensor()),
+            STL10(root=data_root, split="test", transform=transforms.ToTensor()),
+        )
+    else:
+        print("[INFO] Preparing stylized STL10 canny data loader.")
+
+        test_dataset = DualDataset(
+            CannyStylizedDataset(
+                source_dir=stylized_folder_path,
+                model_type=model_type,
+            ),
+            StylizedSTL10Dataset(
+                source_dir=stylized_folder_path,
+                model_type=model_type,
+            ),
+        )
 
     test_loader = DataLoader(
         test_dataset,
@@ -334,18 +396,40 @@ def get_stl10_canny_dual_data_loader(
 
 
 def get_stl10_dexined_dual_data_loader(
-    data_root, download, shuffle=False, batch_size=256, **kwarg
+    data_root,
+    download,
+    shuffle=False,
+    batch_size=256,
+    model_type=ModelType.SIMCLR,
+    stylization=False,
+    stylized_folder_path=None,
+    **kwarg
 ):
-    print("[INFO] Preparing STL10 DexiNed data loader.")
+    if not stylization or not stylized_folder_path:
+        print("[INFO] Preparing STL10 DexiNed data loader.")
 
-    test_dataset = DualDataset(
-        DexiNedTestDataset(
-            csv_file="./Edge_images/Dexi/test/labels.csv",
-            root_dir="./Edge_images/Dexi/test",
-            transform=transforms.ToTensor(),
-        ),
-        STL10(root=data_root, split="test", transform=transforms.ToTensor()),
-    )
+        test_dataset = DualDataset(
+            DexiNedTestDataset(
+                csv_file="./Edge_images/Dexi/test/labels.csv",
+                root_dir="./Edge_images/Dexi/test",
+                transform=transforms.ToTensor(),
+            ),
+            STL10(root=data_root, split="test", transform=transforms.ToTensor()),
+        )
+    else:
+        print("[INFO] Preparing stylized STL10 DexiNed data loader.")
+
+        test_dataset = DualDataset(
+            DexiNedStylizedTestDataset(
+                csv_file="./Edge_images/Dexi_stylized/labels.csv",
+                root_dir="./Edge_images/Dexi_stylized",
+                transform=transforms.ToTensor(),
+            ),
+            StylizedSTL10Dataset(
+                source_dir=stylized_folder_path,
+                model_type=model_type,
+            ),
+        )
 
     test_loader = DataLoader(
         test_dataset,
@@ -539,16 +623,16 @@ def main():
     else:
         model_type = ModelType.VIT
 
-    print("[INFO] Downloading Stylized STL10")
+    # print("[INFO] Downloading Stylized STL10")
 
-    file_id = "1aTVhLVG1pbsFWmoV-KoYB00YSPCSqyEv"
-    gdrive_url = "https://drive.google.com/uc?id={}".format(file_id)
+    # file_id = "1aTVhLVG1pbsFWmoV-KoYB00YSPCSqyEv"
+    # gdrive_url = "https://drive.google.com/uc?id={}".format(file_id)
     stylized_folder_name = "inter_class_stylized_dataset"
     stylized_folder_path = "stylization/{}".format(stylized_folder_name)
-    zip_name = stylized_folder_name + ".zip"
-    gdown.download(gdrive_url, zip_name, quiet=False)
-    shutil.unpack_archive(zip_name, stylized_folder_path)
-    os.remove(zip_name)
+    # zip_name = stylized_folder_name + ".zip"
+    # gdown.download(gdrive_url, zip_name, quiet=False)
+    # shutil.unpack_archive(zip_name, stylized_folder_path)
+    # os.remove(zip_name)
 
     print("[INFO] Starting evaluation...")
 
@@ -591,37 +675,43 @@ def main():
     print("[INFO] Model checkpoint loaded.")
 
     # Evaluate for standard STL10 accuracies
-    test = get_dataloader_fn(data_root=args.data, download=True, batch_size=32)
+    test = get_dataloader_fn(
+        data_root=args.data, download=True, batch_size=args.batch_size
+    )
     stl10_accuracies = compute_accuracies_local(
-        model,
-        args.device,
-        test,
-        args.checkpoint.split(".")[0],
-        model_type,
+        model=model,
+        device=args.device,
+        data_loader=test,
+        model_name=args.checkpoint.split(".")[0],
+        model_type=model_type,
     )
 
     # Evaluate for stylized STL10 accuracies
-    stl10_stylized = StylizedSTL10Dataset(stylized_folder_path)
-    stylized_loader = DataLoader(
-        stl10_stylized,
-        batch_size=32,
-        num_workers=10,
-        drop_last=False,
-        shuffle=True,
+    stylized_loader = get_dataloader_fn(
+        data_root=args.data,
+        download=False,
+        stylization=True,
+        stylized_folder_path=stylized_folder_path,
+        batch_size=args.batch_size,
+        model_type=model_type,
     )
     stl10_stylized_metrics = compute_accuracy_and_ratio(
-        model, args.device, stylized_loader
+        model=model,
+        device=args.device,
+        data_loader=stylized_loader,
+        model_name=args.checkpoint.split(".")[0],
+        model_type=model_type,
     )
 
     # Evaluate for adversarial accuracies
     test = get_dataloader_fn(data_root=args.data, download=False, batch_size=1)
     compute_adversarial_accuracies(
-        [0, 0.01, 0.02, 0.03, 0.04, 0.05],
-        model,
-        args.device,
-        test,
-        args.checkpoint.split(".")[0],
-        model_type,
+        adv_epsilons=[0, 0.01, 0.02, 0.03, 0.04, 0.05],
+        model=model,
+        device=args.device,
+        test_loader=test,
+        model_name=args.checkpoint.split(".")[0],
+        model_type=model_type,
     )
 
     # model = VIT_pretrained("VIT_checkpoints/VIT_5_epochs.pt", device=device)
@@ -635,7 +725,7 @@ def main():
     #     batch_size=32,
     #     num_workers=10,
     #     drop_last=False,
-    #     shuffle=True,
+    #     shuffle=False,
     # )
     # stl10_stylized_metrics = compute_accuracy_and_ratio(model, device, stylized_loader)
 
