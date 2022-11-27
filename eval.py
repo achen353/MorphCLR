@@ -299,7 +299,9 @@ def compute_accuracy_and_ratio(model, device, data_loader, model_name, model_typ
             f.write(
                 "exp,"
                 + ",".join(["class_{}_acc".format(i + 1) for i in range(10)])
+                + ","
                 + ",".join(["class_{}_style".format(i + 1) for i in range(10)])
+                + ","
                 + ",".join(["class_{}_content".format(i + 1) for i in range(10)])
                 + "\n"
             )
@@ -308,7 +310,9 @@ def compute_accuracy_and_ratio(model, device, data_loader, model_name, model_typ
         f.write(
             "{},".format(model_name)
             + ",".join([str(accuracies.get(i, 0)) for i in range(10)])
+            + ","
             + ",".join([str(style_decisions.get(i, 0)) for i in range(10)])
+            + ","
             + ",".join([str(content_decisions.get(i, 0)) for i in range(10)])
             + "\n"
         )
