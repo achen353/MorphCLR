@@ -201,7 +201,7 @@ def compute_accuracies_local(
 #     return data, style_labels, content_labels
 
 
-class stylized_stl10_dataset(torch.utils.data.Dataset):
+class StylizedSTL10Dataset(torch.utils.data.Dataset):
     def __init__(self, source_dir, model_type=ModelType.SIMCLR):
         data = []
         style_labels = []
@@ -601,7 +601,7 @@ def main():
     )
 
     # Evaluate for stylized STL10 accuracies
-    stl10_stylized = stylized_stl10_dataset(stylized_folder_path)
+    stl10_stylized = StylizedSTL10Dataset(stylized_folder_path)
     stylized_loader = DataLoader(
         stl10_stylized,
         batch_size=32,
@@ -629,7 +629,7 @@ def main():
     # test = get_dataloader_fn(data_root=args.data, download=True, batch_size=32, model_type=ModelType.VIT)
     # # stl10_accuracies = compute_accuracies_local(model, device, test, model_type=ModelType.VIT)
 
-    # stl10_stylized = stylized_stl10_dataset(stylized_folder_path, model_type=ModelType.VIT)
+    # stl10_stylized = StylizedSTL10Dataset(stylized_folder_path, model_type=ModelType.VIT)
     # stylized_loader = DataLoader(
     #     stl10_stylized,
     #     batch_size=32,
