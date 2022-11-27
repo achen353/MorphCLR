@@ -126,7 +126,9 @@ parser.add_argument("--gpu-index", default=0, type=int, help="Gpu index.")
 # class stylized_dataset(torch.utils.data.dataset):
 
 
-def compute_accuracies_local(model, device, data_loader, model_type=ModelType.SIMCLR):
+def compute_accuracies_local(
+    model, device, data_loader, model_name, model_type=ModelType.SIMCLR
+):
     # logit dim equals number of classes
     model = model.eval()
     model = model.to(device)
@@ -160,6 +162,21 @@ def compute_accuracies_local(model, device, data_loader, model_type=ModelType.SI
         for i in range(output.shape[0]):
             if preds[i] == target[i]:
                 accuracies[int(preds[i])] += 1 / 800
+
+    file_path = "accuracies.csv"
+    if not os.path.exists(file_path):
+        with open(file_path, "a") as f:
+            f.write(
+                "exp," + ",".join(["class_{}".format(i + 1) for i in range(10)]) + "\n"
+            )
+
+    with open(file_path, "a") as f:
+        f.write(
+            "{},".format(model_name)
+            + ",".join([str(accuracies[i]) for i in range(10)])
+            + "\n"
+        )
+
     print("Accuracies : {}".format(accuracies))
     return accuracies
 
@@ -274,7 +291,7 @@ def get_stl10_data_loader(
     model_type=ModelType.SIMCLR,
     batch_size=256,
 ):
-    print("[INFO] Preparing STL10 adversarial data loaders.")
+    print("[INFO] Preparing STL10 data loader.")
 
     if model_type == ModelType.VIT:
         stl10_transform = transforms.Compose([transforms.ToTensor(), feature_extractor])
@@ -298,6 +315,8 @@ def get_stl10_data_loader(
 def get_stl10_canny_dual_data_loader(
     data_root, download, shuffle=False, batch_size=256, **kwarg
 ):
+    print("[INFO] Preparing STL10 canny data loader.")
+
     test_dataset = DualDataset(
         CannyDataset(root=data_root, split="test", transform=transforms.ToTensor()),
         STL10(root=data_root, split="test", transform=transforms.ToTensor()),
@@ -317,6 +336,8 @@ def get_stl10_canny_dual_data_loader(
 def get_stl10_dexined_dual_data_loader(
     data_root, download, shuffle=False, batch_size=256, **kwarg
 ):
+    print("[INFO] Preparing STL10 DexiNed data loader.")
+
     test_dataset = DualDataset(
         DexiNedTestDataset(
             csv_file="./Edge_images/Dexi/test/labels.csv",
@@ -338,13 +359,21 @@ def get_stl10_dexined_dual_data_loader(
 
 
 # FGSM attack code
-def fgsm_attack(image, epsilon, data_grad, is_canny=False):
+def fgsm_attack(image, epsilon, data_grad, has_canny=False):
     # Collect the element-wise sign of the data gradient
     sign_data_grad = data_grad.sign()
     # Create the perturbed image by adjusting each pixel of the input image
     perturbed_image = image + epsilon * sign_data_grad
     # Adding clipping to maintain [0,1] range
-    perturbed_image = torch.clamp(perturbed_image, 0, 1 if not is_canny else 255)
+    if has_canny:
+        perturbed_image = torch.stack(
+            [
+                torch.clamp(perturbed_image[0], 0, 255),
+                torch.clamp(perturbed_image[1], 0, 1),
+            ]
+        )
+    else:
+        perturbed_image = torch.clamp(perturbed_image, 0, 1)
     # Return the perturbed image
     return perturbed_image
 
@@ -408,8 +437,11 @@ def test_adversarial(
         data_grad = data.grad.data
 
         # Call FGSM Attack
-        is_canny = type(test_loader.dataset.dataset1) == CannyDataset
-        perturbed_data = fgsm_attack(data, epsilon, data_grad, is_canny)
+        has_canny = (
+            type(test_loader.dataset) == DualDataset
+            and type(test_loader.dataset.dataset1) == CannyDataset
+        )
+        perturbed_data = fgsm_attack(data, epsilon, data_grad, has_canny)
 
         # Re-classify the perturbed image
         output = model(perturbed_data)
@@ -530,7 +562,7 @@ def main():
             args.device
         )
         checkpoint = torch.load(model_path)
-        model.load_state_dict(checkpoint["model_state_dict"])
+        model.load_state_dict(checkpoint["state_dict"])
         get_dataloader_fn = get_stl10_data_loader
     elif model_type == ModelType.MORPHCLRSINGLE:
         model = MorphCLRSingleEval(base_model="resnet18")
@@ -564,6 +596,8 @@ def main():
         model,
         args.device,
         test,
+        args.checkpoint.split(".")[0],
+        model_type,
     )
 
     # Evaluate for stylized STL10 accuracies
