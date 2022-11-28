@@ -34,10 +34,13 @@ from vit import VIT_pretrained
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-convert_tensor_fn = torchvision.transforms.ToTensor()
+VIT_INPUT_SIZE = 224
 
-vit_model_type = "google/vit-base-patch16-224-in21k"
-feature_extractor = ViTFeatureExtractor.from_pretrained(vit_model_type)
+convert_tensor_fn = transforms.ToTensor()
+upscale_image_fn = transforms.Resize(VIT_INPUT_SIZE)
+
+VIT_MODEL_TYPE = "google/vit-base-patch16-224-in21k"
+feature_extractor = ViTFeatureExtractor.from_pretrained(VIT_MODEL_TYPE)
 
 
 class ModelType(Enum):
@@ -104,28 +107,55 @@ parser.add_argument(
 parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
 parser.add_argument("--gpu-index", default=0, type=int, help="Gpu index.")
 
-# def get_local_dataset(source_dir, model_type=ModelType.SIMCLR):
-#     # assumes that source dir contains folders of images where each folder of images
-#     # has images from the same class whose name is the name of the folder
-#     # e.g dir/0 (label) / img_x.png
-#     data = []
-#     labels = []
-#     print("[INFO] Preparing local images from: {}".format(source_dir))
-#     for source_path in sorted(os.listdir(source_dir)):
-#         labels.append(int(source_path) - 1)
-#         source_example_path = sorted(os.listdir(os.path.join(source_dir, source_path)))
-#         source_example_path = [os.path.join(source_dir, source_path, x) for x in source_example_path]
-#         tensor_examples = [convert_tensor_fn(Image.open(x).convert('RGB')) for x in source_example_path]
-#         if model_type == ModelType.SIMCLR:
-#             original_tensors = torch.stack(tensor_examples)
-#         elif model_type == ModelType.VIT:
-#             vit_extracted = feature_extractor(tensor_examples, return_tensors = "pt")
-#             original_tensors = vit_extracted['pixel_values']
 
-#         data.append(original_tensors)
-#     print("Found {} labels: {}".format(len(labels), labels))
-#     return data, labels
-# class stylized_dataset(torch.utils.data.dataset):
+class StylizedSTL10Dataset(torch.utils.data.Dataset):
+    def __init__(self, source_dir, model_type=ModelType.SIMCLR):
+        data = []
+        style_labels = []
+        content_labels = []
+        print("[INFO] Preparing stylzed images from: {}".format(source_dir))
+        for source_path in tqdm(sorted(os.listdir(source_dir))):
+            source_example_path = sorted(
+                os.listdir(os.path.join(source_dir, source_path))
+            )
+            source_example_path = [
+                os.path.join(source_dir, source_path, x) for x in source_example_path
+            ]
+            dir_style_labels = torch.tensor(
+                [int(x.split("/")[-1].split("_")[3]) for x in source_example_path]
+            )
+            style_labels.append(dir_style_labels)
+            content_style_labels = torch.tensor(
+                [int(source_path) - 1] * dir_style_labels.shape[0]
+            )
+            content_labels.append(content_style_labels)
+            tensor_images = [
+                convert_tensor_fn(Image.open(x).convert("RGB"))
+                for x in source_example_path
+            ]
+
+            if model_type == ModelType.VIT:
+                tensor_images = [upscale_image_fn(x) for x in tensor_images]
+                vit_extracted = feature_extractor(tensor_images, return_tensors="pt")
+                tensor_images = vit_extracted["pixel_values"]
+            else:
+                tensor_images = torch.stack(tensor_images)
+
+            data.append(tensor_images)
+        data = torch.cat(data, dim=0)
+        style_labels = torch.cat(style_labels, dim=0).reshape(-1, 1)
+        content_labels = torch.cat(content_labels, dim=0).reshape(-1, 1)
+        target = torch.cat((style_labels, content_labels), dim=-1)
+
+        self.data = data
+        self.target = target
+        self.model_type = model_type
+
+    def __len__(self):
+        return self.data.shape[0]
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.target[idx]
 
 
 def compute_accuracies_local(
@@ -181,74 +211,6 @@ def compute_accuracies_local(
 
     print("Accuracies : {}".format(accuracies))
     return accuracies
-
-
-# def get_local_stylized_dataset_tensors(source_dir):
-#     data = []
-#     style_labels = []
-#     content_labels = []
-#     print("[INFO] Preparing stylzed images from: {}".format(source_dir))
-#     for source_path in sorted(os.listdir(source_dir)):
-#         source_example_path = sorted(os.listdir(os.path.join(source_dir, source_path)))
-#         source_example_path = [os.path.join(source_dir, source_path, x) for x in source_example_path]
-#         dir_style_labels = torch.tensor([int(x.split('/')[-1].split('_')[3]) for x in source_example_path])
-#         style_labels.append(dir_style_labels)
-#         content_style_labels = torch.tensor([int(source_path) - 1] * dir_style_labels.shape[0])
-#         content_labels.append(content_style_labels)
-
-#         original_tensors = torch.stack([convert_tensor_fn(Image.open(x).convert('RGB')) for x in source_example_path])
-
-#         data.append(original_tensors)
-
-#     return data, style_labels, content_labels
-
-
-class StylizedSTL10Dataset(torch.utils.data.Dataset):
-    def __init__(self, source_dir, model_type=ModelType.SIMCLR):
-        data = []
-        style_labels = []
-        content_labels = []
-        print("[INFO] Preparing stylzed images from: {}".format(source_dir))
-        for source_path in sorted(os.listdir(source_dir)):
-            source_example_path = sorted(
-                os.listdir(os.path.join(source_dir, source_path))
-            )
-            source_example_path = [
-                os.path.join(source_dir, source_path, x) for x in source_example_path
-            ]
-            dir_style_labels = torch.tensor(
-                [int(x.split("/")[-1].split("_")[3]) for x in source_example_path]
-            )
-            style_labels.append(dir_style_labels)
-            content_style_labels = torch.tensor(
-                [int(source_path) - 1] * dir_style_labels.shape[0]
-            )
-            content_labels.append(content_style_labels)
-            tensor_images = [
-                convert_tensor_fn(Image.open(x).convert("RGB"))
-                for x in source_example_path
-            ]
-
-            if model_type == ModelType.VIT:
-                vit_extracted = feature_extractor(tensor_images, return_tensors="pt")
-                tensor_images = vit_extracted["pixel_values"]
-            else:
-                tensor_images = torch.stack(tensor_images)
-
-            data.append(tensor_images)
-        data = torch.cat(data, dim=0)
-        style_labels = torch.cat(style_labels, dim=0).reshape(-1, 1)
-        content_labels = torch.cat(content_labels, dim=0).reshape(-1, 1)
-        target = torch.cat((style_labels, content_labels), dim=-1)
-
-        self.data = data
-        self.target = target
-
-    def __len__(self):
-        return self.data.shape[0]
-
-    def __getitem__(self, idx):
-        return self.data[idx], self.target[idx]
 
 
 def compute_accuracy_and_ratio(model, device, data_loader, model_name, model_type):
@@ -334,7 +296,7 @@ def get_stl10_data_loader(
 
         if model_type == ModelType.VIT:
             stl10_transform = transforms.Compose(
-                [transforms.ToTensor(), feature_extractor]
+                [transforms.ToTensor(), upscale_image_fn, feature_extractor]
             )
         elif model_type == ModelType.SIMCLR:
             stl10_transform = transforms.ToTensor()
@@ -345,7 +307,7 @@ def get_stl10_data_loader(
     else:
         print("[INFO] Preparing stylized STL10 data loader.")
 
-        test_dataset = StylizedSTL10Dataset(stylized_folder_path)
+        test_dataset = StylizedSTL10Dataset(stylized_folder_path, model_type=model_type)
 
     test_loader = DataLoader(
         test_dataset,
@@ -672,6 +634,10 @@ def main():
             get_dataloader_fn = get_stl10_dexined_dual_data_loader
         else:
             raise Exception("Cannot use standard STL10 dataset for MorphCLR models.")
+    else:
+        # Hardcoded VIT checkpoint path
+        model = VIT_pretrained(model_path, device=args.device)
+        get_dataloader_fn = get_stl10_data_loader
 
     model = model.to(args.device)
     model = model.eval()
@@ -680,7 +646,10 @@ def main():
 
     # Evaluate for standard STL10 accuracies
     test = get_dataloader_fn(
-        data_root=args.data, download=True, batch_size=args.batch_size
+        data_root=args.data,
+        download=True,
+        batch_size=args.batch_size,
+        model_type=model_type,
     )
     stl10_accuracies = compute_accuracies_local(
         model=model,
@@ -708,7 +677,9 @@ def main():
     )
 
     # Evaluate for adversarial accuracies
-    test = get_dataloader_fn(data_root=args.data, download=False, batch_size=1)
+    test = get_dataloader_fn(
+        data_root=args.data, download=False, batch_size=1, model_type=model_type
+    )
     compute_adversarial_accuracies(
         adv_epsilons=[0, 0.01, 0.02, 0.03, 0.04, 0.05],
         model=model,
