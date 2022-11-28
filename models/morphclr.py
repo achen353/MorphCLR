@@ -72,6 +72,7 @@ class MorphCLRSingleEval(MorphCLRBase):
         edge_checkpoint_file_path=None,
         non_edge_checkpoint_file_path=None,
         device="cpu",
+        return_embedding=False,
     ):
         super().__init__(use_pretrained=False)
         self.device = device
@@ -83,6 +84,7 @@ class MorphCLRSingleEval(MorphCLRBase):
             )
         self._init_linear_layer()
         self.to(self.device)
+        self.return_embedding = return_embedding
 
     def _load_checkpoint(
         self, edge_checkpoint_file_path, non_edge_checkpoint_file_path
@@ -128,11 +130,17 @@ class MorphCLRSingleEval(MorphCLRBase):
         non_edge_out = self.non_edge_model(non_edge_x)
         x_cat = torch.cat([edge_out, non_edge_out], dim=1)
         out = self.linear(x_cat)
+
+        if self.return_embedding:
+            return out, x_cat
+
         return out
 
 
 class MorphCLRDualEval(MorphCLRBase):
-    def __init__(self, base_model, checkpoint_file_path=None, device="cpu"):
+    def __init__(
+        self, base_model, checkpoint_file_path=None, device="cpu", return_embedding=True
+    ):
         super().__init__(use_pretrained=False)
         self.device = device
         self.backbone_1 = self._get_basemodel(base_model)
@@ -141,6 +149,7 @@ class MorphCLRDualEval(MorphCLRBase):
             self._load_checkpoint(checkpoint_file_path)
         self._init_linear_layer()
         self.to(self.device)
+        self.return_embedding = return_embedding
 
     def _load_checkpoint(self, checkpoint_file_path):
         checkpoint = torch.load(checkpoint_file_path, map_location=self.device)
@@ -165,4 +174,8 @@ class MorphCLRDualEval(MorphCLRBase):
         non_edge_out = self.backbone_2(non_edge_x)
         x_cat = torch.cat([edge_out, non_edge_out], dim=1)
         out = self.linear(x_cat)
+
+        if self.return_embedding:
+            return out, x_cat
+
         return out

@@ -108,10 +108,32 @@ class DualDataset(Dataset):
     def __len__(self):
         return len(self.dataset1)
 
+    def _assert_label_equal(self, label1, label2):
+        if torch.is_tensor(label1):
+            label1 = label1.clone().numpy()
+        if torch.is_tensor(label2):
+            label2 = label2.clone().numpy()
+
+        label1 = np.array(label1)
+        label2 = np.array(label2)
+
+        if label1.ndim == 0:
+            label1 = label1[np.newaxis]
+        if label2.ndim == 0:
+            label2 = label2[np.newaxis]
+
+        assert np.array_equal(
+            label1, label2
+        ), "[ERROR] Labels Mismatched: label1 is {} but label2 is {}.".format(
+            label1, label2
+        )
+
     def __getitem__(self, index):
         label1 = self.dataset1[index][1]
         label2 = self.dataset2[index][1]
-        assert np.array_equal(label1, label2)
+
+        self._assert_label_equal(label1, label2)
+
         return (self.dataset1[index][0], self.dataset2[index][0], label1)
 
 
