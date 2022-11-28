@@ -689,25 +689,6 @@ def main():
         model_type=model_type,
     )
 
-    # model = VIT_pretrained("VIT_checkpoints/VIT_5_epochs.pt", device=device)
-
-    # test = get_dataloader_fn(data_root=args.data, download=True, batch_size=32, model_type=ModelType.VIT)
-    # # stl10_accuracies = compute_accuracies_local(model, device, test, model_type=ModelType.VIT)
-
-    # stl10_stylized = StylizedSTL10Dataset(stylized_folder_path, model_type=ModelType.VIT)
-    # stylized_loader = DataLoader(
-    #     stl10_stylized,
-    #     batch_size=32,
-    #     num_workers=10,
-    #     drop_last=False,
-    #     shuffle=False,
-    # )
-    # stl10_stylized_metrics = compute_accuracy_and_ratio(model, device, stylized_loader)
-
-    # # Evaluate for adversarial accuracies
-    # test = get_dataloader_fn(data_root=args.data, download=False, model_type=ModelType.VIT)
-    # compute_adversarial_accuracies([0, 0.01, 0.02, 0.03, 0.04, 0.05], model, device, test, model_type=ModelType.VIT)
-
 
 if __name__ == "__main__":
     main()
