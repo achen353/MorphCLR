@@ -252,8 +252,8 @@ def compute_accuracy_and_ratio(model, device, data_loader, model_name, model_typ
                 style_decisions[int(preds[i])] += 1
 
     print("Accuracy: {}".format(accuracies))
-    print("# of style-based decision per class: {}".format(style_decisions))
-    print("# of texture-based decision per class: {}".format(content_decisions))
+    print("# of texture-based decision per class: {}".format(style_decisions))
+    print("# of shape-based decision per class: {}".format(content_decisions))
 
     file_path = "stylized_accuracies.csv"
     if not os.path.exists(file_path):
